@@ -1,0 +1,6 @@
+geo_level_id,geo_level_name,n_geographies,n_industries,fill_rate_pct,first_eigenvalue,second_eigenvalue,ici_ubiquity_correlation,eci_diversity_correlation,eci_avgici_correlation,ici_sign_flipped,eci_sign_flipped
+1,county,3143,947,13.86,1,0.160664,-0.6847,0.8199,1,FALSE,FALSE
+2,state,51,947,33.09,1,0.205078,-0.1757,0.4638,-1,TRUE,FALSE
+3,cbsa,925,947,18.43,1,0.127208,-0.5203,0.6464,1,FALSE,FALSE
+4,csa,181,947,25.77,1,0.135726,-0.4096,0.3392,1,FALSE,TRUE
+5,commuting_zone,588,947,20.29,1,0.151363,-0.625,0.6796,1,FALSE,FALSE
