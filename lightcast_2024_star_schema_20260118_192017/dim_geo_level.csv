@@ -1,0 +1,6 @@
+geo_level_id,geo_level_name,geo_level_description
+1,county,US County (FIPS)
+2,state,US State (FIPS)
+3,cbsa,Core-Based Statistical Area (OMB)
+4,csa,Combined Statistical Area (OMB)
+5,commuting_zone,Commuting Zone (USDA ERS)
