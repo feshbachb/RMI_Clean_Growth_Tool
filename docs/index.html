@@ -301,12 +301,30 @@ body {
   margin-top: 8px;
   font-size: 13px;
 }
-.map-actions a {
+.map-actions a, .map-actions button {
   color: var(--energy-dark);
   text-decoration: none;
   cursor: pointer;
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: inherit;
+  padding: 0;
 }
-.map-actions a:hover { text-decoration: underline; }
+.map-actions a:hover, .map-actions button:hover { text-decoration: underline; }
+.export-bar { display: flex; gap: 12px; align-items: center; margin-top: 8px; font-size: 13px; flex-wrap: wrap; }
+.export-bar span { color: #999; font-weight: 600; }
+.export-bar button {
+  color: var(--energy-dark);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+.export-bar button:hover { background: #e8f8f8; text-decoration: underline; }
 
 /* ── Footer ── */
 .site-footer {
@@ -515,6 +533,58 @@ function getColorScale(metricKey) {
     return CB_RDYLBU;
   }
   return CB_YLGNBU;
+}
+
+// ── RMI logo overlay for Plotly layouts ──
+function rmiLogoImages() {
+  return [{
+    source: 'rmi_logo_dark.svg',
+    xref: 'paper', yref: 'paper',
+    x: 1, y: 0,
+    xanchor: 'right', yanchor: 'bottom',
+    sizex: 0.12, sizey: 0.08,
+    opacity: 0.35,
+    layer: 'above'
+  }];
+}
+
+// ── Multi-format export buttons ──
+function buildExportBar(plotEl, filename, getDataFn) {
+  const bar = document.createElement('div');
+  bar.className = 'export-bar';
+  bar.innerHTML = '<span>Export:</span>';
+
+  ['png', 'svg', 'pdf'].forEach(fmt => {
+    const btn = document.createElement('button');
+    btn.textContent = fmt.toUpperCase();
+    btn.addEventListener('click', () => {
+      Plotly.downloadImage(plotEl, { format: fmt, width: 1200, height: 800, filename: filename });
+    });
+    bar.appendChild(btn);
+  });
+
+  if (getDataFn) {
+    const csvBtn = document.createElement('button');
+    csvBtn.textContent = 'CSV';
+    csvBtn.addEventListener('click', () => {
+      const { rows, columns } = getDataFn();
+      if (!rows || !rows.length) return;
+      const header = columns.map(c => c.label || c.key).join(',');
+      const body = rows.map(r => columns.map(c => {
+        const v = r[c.key];
+        return typeof v === 'string' && v.includes(',') ? '"' + v + '"' : (v == null ? '' : v);
+      }).join(',')).join('\n');
+      const blob = new Blob([header + '\n' + body], { type: 'text/csv' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename + '.csv';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+    bar.appendChild(csvBtn);
+  }
+
+  return bar;
 }
 
 // ════════════════════════════════════════════
@@ -912,11 +982,25 @@ async function loadRegional(level, geoid) {
     Plotly.newPlot(plotEl, [traceNoRCA, traceRCA], {
       xaxis: { title: 'Industry Feasibility', zeroline: false },
       yaxis: { title: 'Industry Complexity', zeroline: false },
+      images: rmiLogoImages(),
       margin: { t: 30, r: 20, b: 50, l: 60 },
       height: 450,
       legend: { x: 0, y: 1, bgcolor: 'rgba(255,255,255,0.8)' },
       font: { family: 'Source Sans Pro, Roboto, sans-serif' }
     }, { responsive: true });
+
+    // Export bar for scatter plot
+    chartDiv.appendChild(buildExportBar(plotEl, 'industry_feasibility_complexity', () => ({
+      rows: enriched.filter(r => r.industry_complexity != null),
+      columns: [
+        { key: 'industry_code', label: 'NAICS Code' },
+        { key: 'industry_description', label: 'Industry' },
+        { key: 'industry_feasibility', label: 'Feasibility' },
+        { key: 'industry_complexity', label: 'Complexity' },
+        { key: 'location_quotient', label: 'Location Quotient' },
+        { key: 'industry_comparative_advantage', label: 'RCA' }
+      ]
+    })));
 
   } catch (err) {
     console.error(err);
@@ -975,7 +1059,7 @@ const METRIC_DESCRIPTIONS = {
   industry_present: 'Whether the industry has measurable employment in each region.'
 };
 
-function buildMapContainer(container, mapId, metricLabel, metricKey, level) {
+function buildMapContainer(container, mapId, metricLabel, metricKey, level, getDataFn) {
   const mapWrap = document.createElement('div');
   mapWrap.className = 'map-container';
 
@@ -993,13 +1077,7 @@ function buildMapContainer(container, mapId, metricLabel, metricKey, level) {
   desc.textContent = METRIC_DESCRIPTIONS[metricKey] || ('Geographic distribution of ' + metricLabel + ' across ' + LEVEL_LABEL[level] + '-level regions.');
   mapWrap.appendChild(desc);
 
-  const actions = document.createElement('div');
-  actions.className = 'map-actions';
-  const dlImg = document.createElement('a');
-  dlImg.textContent = 'Download image';
-  dlImg.addEventListener('click', () => Plotly.downloadImage(plotEl, { format: 'png', width: 1200, height: 800, filename: metricKey + '_' + level + '_map' }));
-  actions.appendChild(dlImg);
-  mapWrap.appendChild(actions);
+  mapWrap.appendChild(buildExportBar(plotEl, metricKey + '_' + level + '_map', getDataFn || null));
 
   container.appendChild(mapWrap);
   return plotEl;
@@ -1035,6 +1113,7 @@ async function renderStateMap(plotEl, geos, metricKey, metricLabel) {
       bgcolor: 'rgba(0,0,0,0)',
       lakecolor: 'rgba(0,0,0,0)'
     },
+    images: rmiLogoImages(),
     margin: { t: 10, r: 10, b: 10, l: 10 },
     height: 480,
     font: { family: 'Source Sans Pro, Roboto, sans-serif' }
@@ -1103,6 +1182,7 @@ async function renderCountyMap(plotEl, dataMap, metricKey, metricLabel, level, p
       subunitcolor: 'rgba(0,0,0,0.15)',
       showsubunits: true
     },
+    images: rmiLogoImages(),
     margin: { t: 10, r: 10, b: 10, l: 10 },
     height: 520,
     font: { family: 'Source Sans Pro, Roboto, sans-serif' }
@@ -1126,7 +1206,14 @@ async function loadNational() {
       const geos = getGeosByLevel(level);
 
       // ── Choropleth Map ──
-      const mapPlotEl = buildMapContainer(container, 'nat-geo-map', metricLabel, metricKey, level);
+      const mapPlotEl = buildMapContainer(container, 'nat-geo-map', metricLabel, metricKey, level, () => ({
+        rows: geos,
+        columns: [
+          { key: 'name', label: 'Geography' },
+          { key: 'geoid', label: 'GeoID' },
+          { key: metricKey, label: metricLabel }
+        ]
+      }));
 
       if (level === 'state') {
         await renderStateMap(mapPlotEl, geos, metricKey, metricLabel);
@@ -1184,10 +1271,20 @@ async function loadNational() {
       }], {
         xaxis: { title: metricLabel },
         yaxis: { title: 'Count' },
+        images: rmiLogoImages(),
         margin: { t: 20, r: 20, b: 50, l: 50 },
         height: 350,
         font: { family: 'Source Sans Pro, Roboto, sans-serif' }
       }, { responsive: true });
+
+      chartDiv.appendChild(buildExportBar(plotEl, metricKey + '_' + level + '_distribution', () => ({
+        rows: geos,
+        columns: [
+          { key: 'name', label: 'Geography' },
+          { key: 'geoid', label: 'GeoID' },
+          { key: metricKey, label: metricLabel }
+        ]
+      })));
 
     } else {
       // Industry mode
@@ -1216,7 +1313,16 @@ async function loadNational() {
 
       // ── Choropleth Map for industry ──
       if (metricKey !== 'industry_present') {
-        const mapPlotEl = buildMapContainer(container, 'nat-ind-map', metricLabel + ' — ' + indDesc, metricKey, level);
+        const mapPlotEl = buildMapContainer(container, 'nat-ind-map', metricLabel + ' — ' + indDesc, metricKey, level, () => ({
+          rows: rows,
+          columns: [
+            { key: 'geo_name', label: 'Geography' },
+            { key: 'geoid', label: 'GeoID' },
+            { key: 'industry_present', label: 'Present' },
+            { key: 'industry_comparative_advantage', label: 'RCA' },
+            { key: metricKey, label: metricLabel }
+          ]
+        }));
         const dataMap = new Map();
         const padLen = level === 'county' ? 5 : level === 'state' ? 2 : 0;
         rows.forEach(r => {
@@ -1280,10 +1386,22 @@ async function loadNational() {
       }], {
         xaxis: { title: metricLabel },
         yaxis: { title: 'Count' },
+        images: rmiLogoImages(),
         margin: { t: 20, r: 20, b: 50, l: 50 },
         height: 350,
         font: { family: 'Source Sans Pro, Roboto, sans-serif' }
       }, { responsive: true });
+
+      chartDiv.appendChild(buildExportBar(plotEl, metricKey + '_' + level + '_' + indCode + '_distribution', () => ({
+        rows: rows,
+        columns: [
+          { key: 'geo_name', label: 'Geography' },
+          { key: 'geoid', label: 'GeoID' },
+          { key: 'industry_present', label: 'Present' },
+          { key: 'industry_comparative_advantage', label: 'RCA' },
+          { key: metricKey, label: metricLabel }
+        ]
+      })));
     }
   } catch (err) {
     console.error(err);
@@ -1440,12 +1558,32 @@ async function loadIndustrySpace() {
     Plotly.newPlot(plotEl, traces, {
       xaxis: { title: 'Industry Centrality', zeroline: false },
       yaxis: { title: 'Industry Complexity', zeroline: false },
+      images: rmiLogoImages(),
       margin: { t: 30, r: 20, b: 50, l: 60 },
       height: 600,
       hovermode: 'closest',
       legend: { x: 0.01, y: 0.99, bgcolor: 'rgba(255,255,255,0.8)' },
       font: { family: 'Source Sans Pro, Roboto, sans-serif' }
     }, { responsive: true });
+
+    chartDiv.appendChild(buildExportBar(plotEl, 'industry_space_network', () => ({
+      rows: nodes.map(n => ({
+        industry_code: n.industry_code,
+        industry_description: n.industry_description,
+        complexity: n.industry_complexity,
+        centrality: n.industry_centrality,
+        ubiquity: n.industry_ubiquity,
+        rca: rcaSet ? (rcaSet.has(String(n.industry_code)) ? 1 : 0) : ''
+      })),
+      columns: [
+        { key: 'industry_code', label: 'NAICS Code' },
+        { key: 'industry_description', label: 'Industry' },
+        { key: 'complexity', label: 'Complexity' },
+        { key: 'centrality', label: 'Centrality' },
+        { key: 'ubiquity', label: 'Ubiquity' },
+        { key: 'rca', label: 'RCA' }
+      ]
+    })));
 
     // ICI Distribution
     const chtitle2 = document.createElement('div'); chtitle2.className = 'section-title';
@@ -1464,10 +1602,13 @@ async function loadIndustrySpace() {
     }], {
       xaxis: { title: 'Industry Complexity Index' },
       yaxis: { title: 'Count' },
+      images: rmiLogoImages(),
       margin: { t: 20, r: 20, b: 50, l: 50 },
       height: 300,
       font: { family: 'Source Sans Pro, Roboto, sans-serif' }
     }, { responsive: true });
+
+    chartDiv2.appendChild(buildExportBar(plotEl2, 'industry_complexity_distribution', null));
 
     // Edge stats
     const statDiv = document.createElement('div');
