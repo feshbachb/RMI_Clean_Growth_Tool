@@ -540,7 +540,19 @@ const CB_PAIRED = ['#a6cee3','#1f78b4','#b2df8a','#33a02c','#fb9a99','#e31a1c','
 
 // Use consistent sequential color scale for all metrics
 function getColorScale(metricKey) {
+  const binaryMetrics = ['industry_present', 'industry_comparative_advantage', 'strategic_gain_possible'];
+  if (binaryMetrics.includes(metricKey)) return [[0, '#f0f0f0'], [1, '#2c7bb6']];
   return CB_YLGNBU;
+}
+
+// Compute percentile-based zmin/zmax to prevent outlier compression
+function percentileClip(values, lo, hi) {
+  if (!values.length) return { zmin: 0, zmax: 1 };
+  const sorted = values.slice().sort((a, b) => a - b);
+  const pLo = sorted[Math.floor(sorted.length * lo)];
+  const pHi = sorted[Math.min(sorted.length - 1, Math.ceil(sorted.length * hi))];
+  if (pLo === pHi) return { zmin: sorted[0], zmax: sorted[sorted.length - 1] };
+  return { zmin: pLo, zmax: pHi };
 }
 
 // ── RMI logo overlay for Plotly layouts ──
@@ -1163,11 +1175,14 @@ async function renderStateMap(plotEl, geos, metricKey, metricLabel) {
     hoverText.push(g.name + '<br>' + metricLabel + ': ' + fmt(g[metricKey]));
   });
 
+  const clip = percentileClip(z, 0.02, 0.98);
   Plotly.newPlot(plotEl, [{
     type: 'choropleth',
     locationmode: 'USA-states',
     locations: locations,
     z: z,
+    zmin: clip.zmin,
+    zmax: clip.zmax,
     text: hoverText,
     hoverinfo: 'text',
     colorscale: getColorScale(metricKey),
@@ -1228,16 +1243,21 @@ async function renderCountyMap(plotEl, dataMap, metricKey, metricLabel, level, p
 
   if (locations.length === 0) return;
 
+  const clip = percentileClip(z, 0.02, 0.98);
   Plotly.newPlot(plotEl, [{
     type: 'choropleth',
     geojson: geojson,
+    featureidkey: 'id',
+    locationmode: 'geojson-id',
     locations: locations,
     z: z,
+    zmin: clip.zmin,
+    zmax: clip.zmax,
     text: hoverText,
     hoverinfo: 'text',
     colorscale: getColorScale(metricKey),
     colorbar: { title: { text: metricLabel, font: { size: 12 } }, thickness: 15, len: 0.6 },
-    marker: { line: { color: 'rgba(255,255,255,0.2)', width: 0.2 } }
+    marker: { line: { color: 'rgba(255,255,255,0.2)', width: 0.5 } }
   }], {
     geo: {
       scope: 'usa',
@@ -1549,9 +1569,15 @@ function runForceLayout(nodes, edges, levelCode) {
   const cacheKey = levelCode + '_' + edges.length;
   if (layoutCache.has(cacheKey)) return layoutCache.get(cacheKey);
 
+  // Seed the PRNG for reproducible layouts
+  let seed = 42;
+  function seededRandom() { seed = (seed * 16807 + 0) % 2147483647; return (seed - 1) / 2147483646; }
+
   const nodeMap = new Map();
   const simNodes = nodes.map((n, i) => {
-    const sn = { id: String(n.industry_code), index: i, x: Math.random() * 800 - 400, y: Math.random() * 800 - 400 };
+    const angle = seededRandom() * 2 * Math.PI;
+    const radius = seededRandom() * 400;
+    const sn = { id: String(n.industry_code), index: i, x: Math.cos(angle) * radius, y: Math.sin(angle) * radius };
     nodeMap.set(sn.id, sn);
     return sn;
   });
@@ -1564,14 +1590,16 @@ function runForceLayout(nodes, edges, levelCode) {
 
   // Run d3-force simulation synchronously
   const sim = d3.forceSimulation(simNodes)
-    .force('link', d3.forceLink(simLinks).id(d => d.id).distance(d => 80 * (1 - d.weight)).strength(d => d.weight * 0.5))
-    .force('charge', d3.forceManyBody().strength(-30).distanceMax(300))
+    .force('link', d3.forceLink(simLinks).id(d => d.id)
+      .distance(d => 120 * (1 - d.weight) + 10)
+      .strength(d => d.weight * 0.8))
+    .force('charge', d3.forceManyBody().strength(-60).distanceMax(500))
     .force('center', d3.forceCenter(0, 0))
-    .force('collide', d3.forceCollide(5))
+    .force('collide', d3.forceCollide(8))
     .stop();
 
-  // Run 200 iterations
-  for (let i = 0; i < 200; i++) sim.tick();
+  // Run 300 iterations for better convergence
+  for (let i = 0; i < 300; i++) sim.tick();
 
   const positions = new Map();
   simNodes.forEach(sn => positions.set(sn.id, { x: sn.x, y: sn.y }));
@@ -1640,7 +1668,7 @@ async function loadIndustrySpace() {
       x: edgeX, y: edgeY,
       mode: 'lines',
       type: 'scatter',
-      line: { color: 'rgba(180,180,180,0.25)', width: 0.4 },
+      line: { color: 'rgba(150,150,150,0.35)', width: 0.5 },
       hoverinfo: 'none',
       showlegend: false
     };
@@ -1648,7 +1676,8 @@ async function loadIndustrySpace() {
     // Node traces using force layout positions
     const complexities = nodes.map(n => n.industry_complexity);
     const ubiquities = nodes.map(n => n.industry_ubiquity);
-    const sizes = ubiquities.map(u => Math.max(5, Math.log(u + 1) * 3.5));
+    const maxUbiq = Math.max(...ubiquities);
+    const sizes = ubiquities.map(u => Math.max(6, 4 + (u / maxUbiq) * 18));
 
     let nodeColors, nodeColorbar;
     if (rcaSet) {
@@ -1670,8 +1699,8 @@ async function loadIndustrySpace() {
         color: nodeColors,
         colorscale: rcaSet ? undefined : 'Viridis',
         colorbar: nodeColorbar,
-        line: { color: 'rgba(0,0,0,0.15)', width: 0.5 },
-        opacity: rcaSet ? nodes.map(n => rcaSet.has(String(n.industry_code)) ? 1 : 0.25) : 0.85
+        line: { color: 'rgba(0,0,0,0.3)', width: 0.7 },
+        opacity: rcaSet ? nodes.map(n => rcaSet.has(String(n.industry_code)) ? 1 : 0.2) : 0.9
       },
       hoverinfo: 'text',
       showlegend: false
