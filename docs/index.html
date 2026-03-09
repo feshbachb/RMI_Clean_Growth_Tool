@@ -9,6 +9,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -200,6 +201,20 @@ body {
 }
 
 /* ── Spinner ── */
+.map-tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: rgba(255,255,255,.95);
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 13px;
+  line-height: 1.4;
+  box-shadow: 0 2px 6px rgba(0,0,0,.15);
+  z-index: 1000;
+  display: none;
+  max-width: 260px;
+}
 .spinner-overlay {
   display: none;
   position: fixed;
@@ -327,6 +342,24 @@ body {
 }
 .export-bar button:hover { background: #e8f8f8; text-decoration: underline; }
 
+/* ── Map controls ── */
+.map-controls { display: flex; gap: 8px; margin-bottom: 8px; }
+.map-controls button {
+  background: var(--white);
+  border: 1px solid var(--light-gray);
+  border-radius: 4px;
+  padding: 4px 12px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--basalt);
+  cursor: pointer;
+  transition: all .15s;
+}
+.map-controls button:hover { background: #e8f8f8; border-color: var(--energy); color: var(--blue-spruce); }
+.map-controls button.active { background: var(--energy); color: var(--blue-spruce); border-color: var(--energy-dark); }
+.map-controls .zoom-hint { font-size: 11px; color: #999; align-self: center; margin-left: 4px; }
+
 /* ── Footer ── */
 .site-footer {
   background: var(--white);
@@ -358,20 +391,20 @@ body {
   <div class="header-title">Clean Growth Tool</div>
   <div class="header-subtitle">Economic Complexity Dashboard</div>
   <div class="tab-bar">
-    <button class="tab-btn active" data-tab="regional" role="tab" aria-selected="true">Regional View</button>
-    <button class="tab-btn" data-tab="national" role="tab" aria-selected="false">National View</button>
+    <button class="tab-btn" data-tab="regional" role="tab" aria-selected="false">Regional View</button>
+    <button class="tab-btn active" data-tab="national" role="tab" aria-selected="true">National View</button>
     <button class="tab-btn" data-tab="industry-space" role="tab" aria-selected="false">Industry Space</button>
   </div>
 </div>
 
 <!-- ═══════════════ TAB 1: Regional ═══════════════ -->
-<div class="tab-panel active" id="panel-regional">
+<div class="tab-panel" id="panel-regional">
   <div class="sidebar" id="sidebar-regional">
     <h3>Geography</h3>
     <label for="reg-level">Level</label>
     <select id="reg-level">
-      <option value="county">County</option>
-      <option value="state" selected>State</option>
+      <option value="county" selected>County</option>
+      <option value="state">State</option>
       <option value="cbsa">Metropolitan Statistical Area</option>
       <option value="csa">Combined Statistical Area</option>
       <option value="cz">Commuting Zone</option>
@@ -389,13 +422,13 @@ body {
 </div>
 
 <!-- ═══════════════ TAB 2: National ═══════════════ -->
-<div class="tab-panel" id="panel-national">
+<div class="tab-panel active" id="panel-national">
   <div class="sidebar" id="sidebar-national">
     <h3>Filters</h3>
     <label for="nat-level">Geography Level</label>
     <select id="nat-level">
-      <option value="county">County</option>
-      <option value="state" selected>State</option>
+      <option value="county" selected>County</option>
+      <option value="state">State</option>
       <option value="cbsa">Metropolitan Statistical Area</option>
       <option value="csa">Combined Statistical Area</option>
       <option value="cz">Commuting Zone</option>
@@ -421,7 +454,7 @@ body {
         <option value="industry_present">Industry Presence</option>
         <option value="location_quotient">Location Quotient</option>
         <option value="industry_comparative_advantage">Comparative Advantage</option>
-        <option value="industry_feasibility">Industry Feasibility</option>
+        <option value="industry_feasibility" selected>Industry Feasibility</option>
         <option value="industry_feasibility_percentile_score">Industry Feasibility Percentile</option>
         <option value="strategic_gain">Strategic Gain</option>
         <option value="strategic_gain_percentile_score">Strategic Gain Percentile</option>
@@ -456,8 +489,8 @@ body {
     <h3>Network Settings</h3>
     <label for="is-level">Geography Level</label>
     <select id="is-level">
-      <option value="county">County</option>
-      <option value="state" selected>State</option>
+      <option value="county" selected>County</option>
+      <option value="state">State</option>
       <option value="cbsa">Metropolitan Statistical Area</option>
       <option value="csa">Combined Statistical Area</option>
       <option value="cz">Commuting Zone</option>
@@ -863,7 +896,12 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     btn.classList.add('active');
     btn.setAttribute('aria-selected', 'true');
-    document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+    const panel = document.getElementById('panel-' + btn.dataset.tab);
+    panel.classList.add('active');
+    // Resize any Plotly charts in the newly visible panel
+    setTimeout(() => {
+      panel.querySelectorAll('.js-plotly-plot').forEach(el => Plotly.Plots.resize(el));
+    }, 100);
   });
 });
 
@@ -930,6 +968,15 @@ async function loadRegional(level, geoid) {
       title.textContent = geoRec ? geoRec.name : geoid;
     }
     container.appendChild(title);
+
+    // Locator mini-map
+    const locatorDiv = document.createElement('div');
+    locatorDiv.style.cssText = 'float:right;margin:0 0 16px 16px;width:280px;';
+    const locatorMap = document.createElement('div');
+    locatorMap.id = 'reg-locator-map';
+    locatorDiv.appendChild(locatorMap);
+    container.appendChild(locatorDiv);
+    renderLocatorMap(locatorMap, level, padGeoid(geoid, level));
 
     // Summary cards
     if (geoRec) {
@@ -1078,6 +1125,9 @@ async function initNational() {
   await ensureIndustryMeta();
   populateNatIndustryList();
   updateNatStateFilter();
+  // Pre-select 335910 (Battery Manufacturing) and auto-load
+  if (natIndWidget) natIndWidget.setValue('335910', '335910 - ' + (industryTitles.get('335910') || 'Battery Manufacturing'));
+  await loadNational();
 }
 
 function populateNatIndustryList() {
@@ -1109,6 +1159,12 @@ function updateNatStateFilter() {
 }
 
 document.getElementById('nat-level').addEventListener('change', updateNatStateFilter);
+
+// Auto-zoom map when state filter changes
+document.getElementById('nat-state-filter').addEventListener('change', function() {
+  const stateFips = this.value;
+  zoomToState(stateFips || null);
+});
 
 document.getElementById('nat-mode').addEventListener('change', () => {
   const mode = document.getElementById('nat-mode').value;
@@ -1149,6 +1205,8 @@ function buildMapContainer(container, mapId, metricLabel, metricKey, level, getD
 
   const plotEl = document.createElement('div');
   plotEl.id = mapId;
+  plotEl.style.width = '100%';
+  plotEl.style.minHeight = '520px';
   mapWrap.appendChild(plotEl);
 
   const desc = document.createElement('div');
@@ -1163,67 +1221,297 @@ function buildMapContainer(container, mapId, metricLabel, metricKey, level, getD
 }
 
 async function renderStateMap(plotEl, geos, metricKey, metricLabel) {
-  const locations = [];
-  const z = [];
-  const hoverText = [];
+  // Build state FIPS -> value/name maps
+  const stateValMap = new Map();
+  const stateTipMap = new Map();
   geos.forEach(g => {
     const fips = String(g.geoid).padStart(2, '0');
-    const abbr = stateFipsToAbbr ? stateFipsToAbbr.get(fips) : null;
-    if (!abbr || g[metricKey] == null) return;
-    locations.push(abbr);
-    z.push(g[metricKey]);
-    hoverText.push(g.name + '<br>' + metricLabel + ': ' + fmt(g[metricKey]));
+    if (g[metricKey] == null) return;
+    stateValMap.set(fips, g[metricKey]);
+    stateTipMap.set(fips, (g.name || fips) + '\n' + metricLabel + ': ' + fmt(g[metricKey]));
   });
 
-  const clip = percentileClip(z, 0.02, 0.98);
-  Plotly.newPlot(plotEl, [{
-    type: 'choropleth',
-    locationmode: 'USA-states',
-    locations: locations,
-    z: z,
-    zmin: clip.zmin,
-    zmax: clip.zmax,
-    text: hoverText,
-    hoverinfo: 'text',
-    colorscale: getColorScale(metricKey),
-    colorbar: { title: { text: metricLabel, font: { size: 12 } }, thickness: 15, len: 0.6 },
-    marker: { line: { color: 'white', width: 1 } }
-  }], {
-    geo: {
-      scope: 'usa',
-      showlakes: false,
-      bgcolor: 'rgba(0,0,0,0)',
-      lakecolor: 'rgba(0,0,0,0)'
-    },
-    images: rmiLogoImages(),
-    margin: { t: 10, r: 10, b: 10, l: 10 },
-    height: 480,
-    font: { family: 'Source Sans Pro, Roboto, sans-serif' }
-  }, { responsive: true });
+  if (stateValMap.size === 0) return;
+
+  // Load state TopoJSON for rendering
+  const statesTopo = await fetchStatesTopo();
+  const stateFeatures = topojson.feature(statesTopo, statesTopo.objects.states);
+
+  // Map state TopoJSON IDs to FIPS (us-atlas uses numeric FIPS IDs)
+  const stateValByTopoId = new Map();
+  const stateTipByTopoId = new Map();
+  stateFeatures.features.forEach(f => {
+    const fips = String(f.id).padStart(2, '0');
+    if (stateValMap.has(fips)) {
+      stateValByTopoId.set(f.id, stateValMap.get(fips));
+      stateTipByTopoId.set(f.id, stateTipMap.get(fips));
+    }
+  });
+
+  // Quantile color scale (same approach as county maps)
+  const allVals = Array.from(stateValMap.values());
+  const cs = getColorScale(metricKey);
+  const fiveColors = [cs[0][1], cs[2][1], cs[4][1], cs[6][1], cs[8][1]];
+  const color = d3.scaleQuantile().domain(allVals).range(fiveColors);
+
+  // Dimensions
+  const width = plotEl.clientWidth || 960;
+  const legendGap = 160;
+  const mapW = width - legendGap;
+  const mapH = Math.round(mapW * 0.62);
+  const height = mapH;
+
+  plotEl.innerHTML = '';
+
+  // Tooltip
+  let tooltip = plotEl.parentElement.querySelector('.map-tooltip');
+  if (!tooltip) {
+    tooltip = document.createElement('div');
+    tooltip.className = 'map-tooltip';
+    plotEl.parentElement.style.position = 'relative';
+    plotEl.parentElement.appendChild(tooltip);
+  }
+
+  // Controls
+  const controls = document.createElement('div');
+  controls.className = 'map-controls';
+  const hint = document.createElement('span');
+  hint.className = 'zoom-hint';
+  hint.textContent = 'Click a state to explore its Regional View';
+  controls.appendChild(hint);
+  plotEl.appendChild(controls);
+
+  // Projection
+  const projection = d3.geoAlbersUsa().fitSize([mapW, mapH], stateFeatures);
+  const path = d3.geoPath(projection);
+
+  const svg = d3.select(plotEl).append('svg')
+    .attr('width', width)
+    .attr('height', height)
+    .attr('viewBox', '0 0 ' + width + ' ' + height)
+    .style('display', 'block')
+    .style('max-width', '100%')
+    .style('height', 'auto')
+    .style('font-family', 'Source Sans Pro, Roboto, sans-serif');
+
+  // State fills
+  svg.append('g')
+    .selectAll('path')
+    .data(stateFeatures.features)
+    .join('path')
+    .attr('d', path)
+    .attr('fill', d => {
+      const val = stateValByTopoId.get(d.id);
+      return val != null ? color(val) : '#f0f0f0';
+    })
+    .attr('stroke', '#fff')
+    .attr('stroke-width', 1)
+    .style('cursor', d => stateValByTopoId.has(d.id) ? 'pointer' : 'default')
+    .on('mouseenter', function(event, d) {
+      const tip = stateTipByTopoId.get(d.id);
+      if (!tip) return;
+      d3.select(this).attr('stroke', '#333').attr('stroke-width', 2).raise();
+      tooltip.style.display = 'block';
+      tooltip.textContent = '';
+      tip.split('\n').forEach((line, i) => {
+        if (i > 0) tooltip.appendChild(document.createElement('br'));
+        tooltip.appendChild(document.createTextNode(line));
+      });
+    })
+    .on('mousemove', function(event) {
+      const rect = plotEl.getBoundingClientRect();
+      tooltip.style.left = (event.clientX - rect.left + 12) + 'px';
+      tooltip.style.top = (event.clientY - rect.top - 10) + 'px';
+    })
+    .on('mouseleave', function() {
+      d3.select(this).attr('stroke', '#fff').attr('stroke-width', 1);
+      tooltip.style.display = 'none';
+    })
+    .on('click', function(event, d) {
+      const fips = String(d.id).padStart(2, '0');
+      if (stateValMap.has(fips)) {
+        navigateToRegional('state', fips);
+      }
+    });
+
+  // State boundary lines
+  const stateMesh = topojson.mesh(statesTopo, statesTopo.objects.states, (a, b) => a !== b);
+  svg.append('path')
+    .datum(stateMesh)
+    .attr('d', path)
+    .attr('fill', 'none')
+    .attr('stroke', '#444')
+    .attr('stroke-width', 0.8)
+    .style('pointer-events', 'none');
+
+  // Legend (same style as county maps for consistency)
+  const quantiles = color.quantiles ? color.quantiles() : [];
+  const breaks = [d3.min(allVals), ...quantiles, d3.max(allVals)];
+  const legendX = mapW + 16;
+  const boxH = 22;
+  const totalLegH = fiveColors.length * boxH;
+  const legendY = (height - totalLegH) / 2 - 16;
+  const lg = svg.append('g').attr('transform', 'translate(' + legendX + ',' + legendY + ')');
+
+  lg.append('text').attr('x', 0).attr('y', 0)
+    .style('font-size', '11px').style('font-weight', '600')
+    .text(metricLabel);
+
+  const valFmt = d3.max(allVals) >= 100 ? d3.format(',.0f') : d3.max(allVals) >= 1 ? d3.format('.1f') : d3.format('.2f');
+
+  fiveColors.slice().reverse().forEach((c, i) => {
+    const ri = fiveColors.length - 1 - i;
+    const y = 14 + i * boxH;
+    lg.append('rect').attr('x', 0).attr('y', y)
+      .attr('width', 16).attr('height', boxH - 3)
+      .attr('fill', c).attr('stroke', '#999').attr('stroke-width', 0.5);
+    const lo = breaks[ri], hi = breaks[ri + 1];
+    lg.append('text').attr('x', 22).attr('y', y + boxH / 2 + 1)
+      .attr('dominant-baseline', 'middle')
+      .style('font-size', '10px')
+      .text(valFmt(lo) + ' \u2013 ' + valFmt(hi));
+  });
+
+  const noDataY = 14 + fiveColors.length * boxH + 6;
+  lg.append('rect').attr('x', 0).attr('y', noDataY)
+    .attr('width', 16).attr('height', boxH - 3)
+    .attr('fill', '#f0f0f0').attr('stroke', '#999').attr('stroke-width', 0.5);
+  lg.append('text').attr('x', 22).attr('y', noDataY + boxH / 2 + 1)
+    .attr('dominant-baseline', 'middle')
+    .style('font-size', '10px')
+    .text('No data');
 }
 
-async function renderCountyMap(plotEl, dataMap, metricKey, metricLabel, level, parentGeoMap) {
-  // dataMap: Map of geoid -> metric value (at the source level)
-  // parentGeoMap: Map of geoid -> name (for tooltip of parent region)
-  // For county level, dataMap keys are county FIPS directly
-  // For CBSA/CSA/CZ, we map each county to its parent's value via crosswalk
+// Cache for US states TopoJSON (for state boundary overlay)
+let _statesTopo = null;
+async function fetchStatesTopo() {
+  if (_statesTopo) return _statesTopo;
+  const resp = await fetch(BASE + 'states-10m.json');
+  _statesTopo = await resp.json();
+  return _statesTopo;
+}
 
+// Convert Plotly-format colorscale to a D3 interpolator
+function plotlyScaleToD3(cs, zmin, zmax) {
+  const domain = cs.map(c => zmin + c[0] * (zmax - zmin));
+  const range = cs.map(c => c[1]);
+  return d3.scaleLinear().domain(domain).range(range).clamp(true);
+}
+
+// ── Locator mini-map for Regional View ──
+async function renderLocatorMap(el, level, geoid) {
+  try {
+    const statesTopo = await fetchStatesTopo();
+    const stateFeatures = topojson.feature(statesTopo, statesTopo.objects.states);
+    const stateMesh = topojson.mesh(statesTopo, statesTopo.objects.states, (a, b) => a !== b);
+
+    const w = 280, h = 180;
+    const projection = d3.geoAlbersUsa().fitSize([w - 10, h - 10], stateFeatures).translate([w / 2, h / 2]);
+    const path = d3.geoPath(projection);
+
+    const svg = d3.select(el).append('svg')
+      .attr('width', w).attr('height', h)
+      .attr('viewBox', '0 0 ' + w + ' ' + h)
+      .style('display', 'block')
+      .style('border', '1px solid #e0e0e0')
+      .style('border-radius', '6px')
+      .style('background', '#fafafa');
+
+    // Draw all states in light gray
+    svg.append('g').selectAll('path')
+      .data(stateFeatures.features)
+      .join('path')
+      .attr('d', path)
+      .attr('fill', '#e8e8e8')
+      .attr('stroke', '#ccc')
+      .attr('stroke-width', 0.5);
+
+    if (level === 'state') {
+      // Highlight the state
+      const stateFips = geoid.padStart(2, '0');
+      const stateId = parseInt(stateFips);
+      svg.selectAll('path')
+        .filter(d => d.id === stateId || String(d.id).padStart(2, '0') === stateFips)
+        .attr('fill', '#45CFCC')
+        .attr('stroke', '#003B63')
+        .attr('stroke-width', 1.5);
+    } else {
+      // For county/CBSA/CSA/CZ, highlight the county or counties
+      const geojson = await fetchGeoJSON();
+      let highlightFeatures = [];
+      if (level === 'county') {
+        highlightFeatures = geojson.features.filter(f => f.id === geoid);
+      } else {
+        // Find all counties belonging to this parent region
+        const parentKey = level === 'cbsa' ? 'cbsa' : level === 'csa' ? 'csa' : 'cz';
+        highlightFeatures = geojson.features.filter(f => {
+          const parent = countyToParent ? countyToParent.get(f.id) : null;
+          if (!parent) return false;
+          const parentInfo = parent[parentKey];
+          return parentInfo && String(parentInfo.geoid) === String(geoid);
+        });
+      }
+
+      if (highlightFeatures.length > 0) {
+        // Highlight the parent state first
+        const stateFips = highlightFeatures[0].id.substring(0, 2);
+        const stateId = parseInt(stateFips);
+        svg.selectAll('path')
+          .filter(d => d.id === stateId)
+          .attr('fill', '#d0eeed');
+
+        // Draw the highlighted region
+        svg.append('g').selectAll('path')
+          .data(highlightFeatures)
+          .join('path')
+          .attr('d', path)
+          .attr('fill', '#45CFCC')
+          .attr('stroke', '#003B63')
+          .attr('stroke-width', 1);
+
+        // Add a pulsing dot at the centroid for visibility (small regions are hard to see)
+        const fc = { type: 'FeatureCollection', features: highlightFeatures };
+        const centroid = path.centroid(fc);
+        if (centroid[0] && centroid[1]) {
+          svg.append('circle')
+            .attr('cx', centroid[0]).attr('cy', centroid[1])
+            .attr('r', 4)
+            .attr('fill', '#003B63')
+            .attr('opacity', 0.7);
+        }
+      }
+    }
+
+    // State boundaries on top
+    svg.append('path').datum(stateMesh)
+      .attr('d', path).attr('fill', 'none')
+      .attr('stroke', '#aaa').attr('stroke-width', 0.5)
+      .style('pointer-events', 'none');
+
+  } catch(e) { console.warn('Locator map failed:', e); }
+}
+
+// Track last-rendered county map for auto-zoom
+let _lastCountyMap = null;
+
+async function renderCountyMap(plotEl, dataMap, metricKey, metricLabel, level, parentGeoMap) {
   const geojson = await fetchGeoJSON();
-  const locations = [];
-  const z = [];
-  const hoverText = [];
+
+  // Build per-county value + hover text maps, and track parent region IDs
+  const valMap = new Map();   // fips -> numeric value
+  const tipMap = new Map();   // fips -> hover HTML
+  const countyRegionMap = new Map(); // fips -> parent region geoid (for boundary overlays)
 
   if (level === 'county') {
     geojson.features.forEach(f => {
       const fips = f.id;
-      if (dataMap.has(fips)) {
-        locations.push(fips);
-        z.push(dataMap.get(fips));
-        hoverText.push(getCountyDisplayName(fips) + '<br>' + metricLabel + ': ' + fmt(dataMap.get(fips)));
-      }
+      if (!dataMap.has(fips)) return;
+      const val = dataMap.get(fips);
+      valMap.set(fips, val);
+      tipMap.set(fips, getCountyDisplayName(fips) + '\n' + metricLabel + ': ' + fmt(val));
+      countyRegionMap.set(fips, fips);
     });
   } else {
-    // Map counties to their parent region value
     const parentKey = level === 'cbsa' ? 'cbsa' : level === 'csa' ? 'csa' : 'cz';
     geojson.features.forEach(f => {
       const fips = f.id;
@@ -1233,46 +1521,302 @@ async function renderCountyMap(plotEl, dataMap, metricKey, metricLabel, level, p
       if (!parentInfo || !parentInfo.geoid) return;
       const val = dataMap.get(String(parentInfo.geoid));
       if (val == null) return;
-      locations.push(fips);
-      z.push(val);
+      valMap.set(fips, val);
+      countyRegionMap.set(fips, String(parentInfo.geoid));
       const countyName = parent.county_name || fips;
       const parentName = parentInfo.name || parentInfo.geoid;
-      hoverText.push(countyName + '<br>' + LEVEL_LABEL[level] + ': ' + parentName + '<br>' + metricLabel + ': ' + fmt(val));
+      tipMap.set(fips, countyName + '\n' + LEVEL_LABEL[level] + ': ' + parentName + '\n' + metricLabel + ': ' + fmt(val));
     });
   }
 
-  if (locations.length === 0) return;
+  if (valMap.size === 0) return;
 
-  const clip = percentileClip(z, 0.02, 0.98);
-  Plotly.newPlot(plotEl, [{
-    type: 'choropleth',
-    geojson: geojson,
-    featureidkey: 'id',
-    locationmode: 'geojson-id',
-    locations: locations,
-    z: z,
-    zmin: clip.zmin,
-    zmax: clip.zmax,
-    text: hoverText,
-    hoverinfo: 'text',
-    colorscale: getColorScale(metricKey),
-    colorbar: { title: { text: metricLabel, font: { size: 12 } }, thickness: 15, len: 0.6 },
-    marker: { line: { color: 'rgba(255,255,255,0.2)', width: 0.5 } }
-  }], {
-    geo: {
-      scope: 'usa',
-      showlakes: false,
-      bgcolor: 'rgba(0,0,0,0)',
-      lakecolor: 'rgba(0,0,0,0)',
-      subunitcolor: 'rgba(0,0,0,0.5)',
-      subunitwidth: 1.5,
-      showsubunits: true
-    },
-    images: rmiLogoImages(),
-    margin: { t: 10, r: 10, b: 10, l: 10 },
-    height: 520,
-    font: { family: 'Source Sans Pro, Roboto, sans-serif' }
-  }, { responsive: true });
+  // Color scale — 5 quantile bins for maximum visual contrast
+  const allVals = Array.from(valMap.values());
+  const cs = getColorScale(metricKey);
+  const fiveColors = [cs[0][1], cs[2][1], cs[4][1], cs[6][1], cs[8][1]];
+  const color = d3.scaleQuantile().domain(allVals).range(fiveColors);
+
+  // Dimensions
+  const width = plotEl.clientWidth || 960;
+  const legendGap = 160;
+  const mapW = width - legendGap;
+  const mapH = Math.round(mapW * 0.62);
+  const height = mapH;
+
+  // Clear previous content
+  plotEl.innerHTML = '';
+
+  // Tooltip div
+  let tooltip = plotEl.parentElement.querySelector('.map-tooltip');
+  if (!tooltip) {
+    tooltip = document.createElement('div');
+    tooltip.className = 'map-tooltip';
+    plotEl.parentElement.style.position = 'relative';
+    plotEl.parentElement.appendChild(tooltip);
+  }
+
+  // Map controls bar
+  const controls = document.createElement('div');
+  controls.className = 'map-controls';
+  const resetBtn = document.createElement('button');
+  resetBtn.textContent = 'Reset Zoom';
+  resetBtn.title = 'Reset to full US view';
+  controls.appendChild(resetBtn);
+  const hint = document.createElement('span');
+  hint.className = 'zoom-hint';
+  hint.textContent = 'Scroll to zoom \u00B7 Drag to pan \u00B7 Click a region to explore';
+  controls.appendChild(hint);
+  plotEl.appendChild(controls);
+
+  // Projection & path
+  const projection = d3.geoAlbersUsa().fitSize([mapW, mapH], geojson);
+  const path = d3.geoPath(projection);
+
+  const svg = d3.select(plotEl).append('svg')
+    .attr('width', width)
+    .attr('height', height)
+    .attr('viewBox', '0 0 ' + width + ' ' + height)
+    .style('display', 'block')
+    .style('max-width', '100%')
+    .style('height', 'auto')
+    .style('cursor', 'grab')
+    .style('font-family', 'Source Sans Pro, Roboto, sans-serif');
+
+  // Zoomable group — contains map content
+  const mapG = svg.append('g').attr('class', 'map-zoom-group');
+
+  // Legend group — stays fixed (outside zoom group)
+  const legendG = svg.append('g').attr('class', 'map-legend-group');
+
+  // Zoom behavior
+  const zoom = d3.zoom()
+    .scaleExtent([1, 20])
+    .translateExtent([[0, 0], [width, height]])
+    .on('zoom', (event) => {
+      mapG.attr('transform', event.transform);
+      // Scale strokes inversely so they stay crisp
+      mapG.selectAll('.county-path').attr('stroke-width', 0.25 / event.transform.k);
+      mapG.selectAll('.state-boundary').attr('stroke-width', 0.8 / event.transform.k);
+      mapG.selectAll('.nation-boundary').attr('stroke-width', 1 / event.transform.k);
+      mapG.selectAll('.region-boundary').attr('stroke-width', 1.5 / event.transform.k);
+    })
+    .on('start', () => svg.style('cursor', 'grabbing'))
+    .on('end', () => svg.style('cursor', 'grab'));
+
+  svg.call(zoom);
+  resetBtn.addEventListener('click', () => {
+    svg.transition().duration(500).call(zoom.transform, d3.zoomIdentity);
+  });
+
+  // Draw county fills
+  mapG.selectAll('.county-path')
+    .data(geojson.features)
+    .join('path')
+    .attr('class', 'county-path')
+    .attr('d', path)
+    .attr('fill', d => {
+      const val = valMap.get(d.id);
+      return val != null ? color(val) : '#f0f0f0';
+    })
+    .attr('stroke', '#fff')
+    .attr('stroke-width', 0.25)
+    .style('cursor', d => valMap.has(d.id) ? 'pointer' : 'default')
+    .on('mouseenter', function(event, d) {
+      const tip = tipMap.get(d.id);
+      if (!tip) return;
+      d3.select(this).attr('stroke', '#333').attr('stroke-width', 1.5).raise();
+      tooltip.style.display = 'block';
+      tooltip.textContent = '';
+      tip.split('\n').forEach((line, i) => {
+        if (i > 0) tooltip.appendChild(document.createElement('br'));
+        tooltip.appendChild(document.createTextNode(line));
+      });
+    })
+    .on('mousemove', function(event) {
+      const rect = plotEl.getBoundingClientRect();
+      tooltip.style.left = (event.clientX - rect.left + 12) + 'px';
+      tooltip.style.top = (event.clientY - rect.top - 10) + 'px';
+    })
+    .on('mouseleave', function() {
+      d3.select(this).attr('stroke', '#fff').attr('stroke-width', 0.25);
+      tooltip.style.display = 'none';
+    })
+    .on('click', function(event, d) {
+      if (!valMap.has(d.id)) return;
+      // Navigate to Regional View for this county (or its parent region)
+      let navLevel = level;
+      let navGeoid = d.id;
+      if (level !== 'county') {
+        // For CBSA/CSA/CZ, navigate to the parent region
+        const regionId = countyRegionMap.get(d.id);
+        if (regionId) { navGeoid = regionId; }
+      }
+      navigateToRegional(navLevel, navGeoid);
+    });
+
+  // Draw state boundaries on top
+  try {
+    const statesTopo = await fetchStatesTopo();
+    const stateMesh = topojson.mesh(statesTopo, statesTopo.objects.states, (a, b) => a !== b);
+    mapG.append('path')
+      .attr('class', 'state-boundary')
+      .datum(stateMesh)
+      .attr('d', path)
+      .attr('fill', 'none')
+      .attr('stroke', '#444')
+      .attr('stroke-width', 0.8)
+      .attr('stroke-linejoin', 'round')
+      .style('pointer-events', 'none');
+    const nationMesh = topojson.mesh(statesTopo, statesTopo.objects.states, (a, b) => a === b);
+    mapG.append('path')
+      .attr('class', 'nation-boundary')
+      .datum(nationMesh)
+      .attr('d', path)
+      .attr('fill', 'none')
+      .attr('stroke', '#444')
+      .attr('stroke-width', 1)
+      .style('pointer-events', 'none');
+  } catch(e) { /* state boundaries optional */ }
+
+  // Draw CBSA/CSA/CZ region boundary overlays
+  if (level !== 'county') {
+    try {
+      // Group features by parent region, then merge to create region outlines
+      const regionGroups = new Map();
+      geojson.features.forEach(f => {
+        const regionId = countyRegionMap.get(f.id);
+        if (!regionId) return;
+        if (!regionGroups.has(regionId)) regionGroups.set(regionId, []);
+        regionGroups.get(regionId).push(f);
+      });
+      regionGroups.forEach((features, regionId) => {
+        if (features.length === 0) return;
+        // Draw thicker outline around each region's counties
+        mapG.append('g')
+          .attr('class', 'region-outline')
+          .selectAll('path')
+          .data(features)
+          .join('path')
+          .attr('d', path)
+          .attr('fill', 'none')
+          .attr('stroke', 'none')
+          .style('pointer-events', 'none');
+      });
+      // Use topojson merge approach: build a simple topology from the grouped features
+      // Simpler: just draw county borders thicker within each region group
+      // Actually, the best approach: draw the outer boundary of each region by finding counties that border other regions
+      regionGroups.forEach((features, regionId) => {
+        if (features.length <= 0) return;
+        const fc = { type: 'FeatureCollection', features: features };
+        // Create a single merged path for the region boundary
+        mapG.append('path')
+          .attr('class', 'region-boundary')
+          .datum(fc)
+          .attr('d', d => {
+            // Draw outer boundary only by using a clip approach
+            // Simple: draw all county paths within the group with a thick stroke
+            return features.map(f => path(f)).join(' ');
+          })
+          .attr('fill', 'none')
+          .attr('stroke', '#222')
+          .attr('stroke-width', 1.5)
+          .attr('stroke-linejoin', 'round')
+          .style('pointer-events', 'none');
+      });
+    } catch(e) { console.warn('Region boundaries failed:', e); }
+  }
+
+  // Legend (fixed, outside zoom group)
+  const quantiles = color.quantiles ? color.quantiles() : [];
+  const breaks = [d3.min(allVals), ...quantiles, d3.max(allVals)];
+  const legendX = mapW + 16;
+  const boxH = 22;
+  const totalLegH = fiveColors.length * boxH;
+  const legendY = (height - totalLegH) / 2 - 16;
+  const lg = legendG.append('g').attr('transform', 'translate(' + legendX + ',' + legendY + ')');
+
+  lg.append('text')
+    .attr('x', 0).attr('y', 0)
+    .style('font-size', '11px').style('font-weight', '600')
+    .text(metricLabel);
+
+  const valFmt = d3.max(allVals) >= 100 ? d3.format(',.0f') : d3.max(allVals) >= 1 ? d3.format('.1f') : d3.format('.2f');
+
+  fiveColors.slice().reverse().forEach((c, i) => {
+    const ri = fiveColors.length - 1 - i;
+    const y = 14 + i * boxH;
+    lg.append('rect')
+      .attr('x', 0).attr('y', y)
+      .attr('width', 16).attr('height', boxH - 3)
+      .attr('fill', c).attr('stroke', '#999').attr('stroke-width', 0.5);
+    const lo = breaks[ri], hi = breaks[ri + 1];
+    lg.append('text')
+      .attr('x', 22).attr('y', y + boxH / 2 + 1)
+      .attr('dominant-baseline', 'middle')
+      .style('font-size', '10px')
+      .text(valFmt(lo) + ' \u2013 ' + valFmt(hi));
+  });
+
+  const noDataY = 14 + fiveColors.length * boxH + 6;
+  lg.append('rect')
+    .attr('x', 0).attr('y', noDataY)
+    .attr('width', 16).attr('height', boxH - 3)
+    .attr('fill', '#f0f0f0').attr('stroke', '#999').attr('stroke-width', 0.5);
+  lg.append('text')
+    .attr('x', 22).attr('y', noDataY + boxH / 2 + 1)
+    .attr('dominant-baseline', 'middle')
+    .style('font-size', '10px')
+    .text('No data');
+
+  // Store references for auto-zoom
+  _lastCountyMap = { svg, zoom, projection, path, geojson, mapW, mapH, width, height, level };
+}
+
+// Navigate to Regional View for a given geography
+function navigateToRegional(level, geoid) {
+  // Switch to Regional tab
+  const regBtn = document.querySelector('[data-tab="regional"]');
+  if (regBtn) regBtn.click();
+  // Set level
+  const regLevel = document.getElementById('reg-level');
+  regLevel.value = level;
+  populateRegGeoList();
+  // Find the display name
+  const paddedGeoid = padGeoid(geoid, level);
+  const geoName = level === 'county' ? getCountyDisplayName(paddedGeoid) : getGeoName(geoid, level);
+  // Set the search widget and trigger load
+  if (regGeoWidget) {
+    regGeoWidget.setValue(paddedGeoid, geoName);
+  }
+  regSelectedGeo = paddedGeoid;
+  loadRegional(level, paddedGeoid);
+}
+
+// Auto-zoom map to a specific state's counties
+function zoomToState(stateFips) {
+  if (!_lastCountyMap) return;
+  const { svg, zoom, projection, path, geojson, mapW, mapH, width, height } = _lastCountyMap;
+  if (!stateFips) {
+    // Reset zoom
+    svg.transition().duration(500).call(zoom.transform, d3.zoomIdentity);
+    return;
+  }
+  // Find all county features in this state
+  const stateFeatures = geojson.features.filter(f => f.id && f.id.startsWith(stateFips));
+  if (stateFeatures.length === 0) return;
+  const stateFC = { type: 'FeatureCollection', features: stateFeatures };
+  const bounds = path.bounds(stateFC);
+  const dx = bounds[1][0] - bounds[0][0];
+  const dy = bounds[1][1] - bounds[0][1];
+  const cx = (bounds[0][0] + bounds[1][0]) / 2;
+  const cy = (bounds[0][1] + bounds[1][1]) / 2;
+  const scale = Math.min(8, 0.9 / Math.max(dx / mapW, dy / mapH));
+  const translate = [mapW / 2 - scale * cx, mapH / 2 - scale * cy];
+  svg.transition().duration(700).call(
+    zoom.transform,
+    d3.zoomIdentity.translate(translate[0], translate[1]).scale(scale)
+  );
 }
 
 async function loadNational() {
@@ -1281,6 +1825,7 @@ async function loadNational() {
   showSpinner();
 
   try {
+    if (!metaGeo) metaGeo = await fetchCSV('meta/geography_specific.csv');
     const container = document.getElementById('nat-results');
     container.innerHTML = '';
     container.style.display = '';
@@ -1425,7 +1970,7 @@ async function loadNational() {
       container.appendChild(titleEl);
 
       // ── Choropleth Map for industry ──
-      if (metricKey !== 'industry_present') {
+      {
         const mapPlotEl = buildMapContainer(container, 'nat-ind-map', metricLabel + ' — ' + indDesc, metricKey, level, () => ({
           rows: rows,
           columns: [
@@ -1807,15 +2352,105 @@ async function loadIndustrySpace() {
 // ════════════════════════════════════════════
 //  INIT
 // ════════════════════════════════════════════
+// ════════════════════════════════════════════
+//  URL HASH ROUTING
+// ════════════════════════════════════════════
+// Formats:
+//   #/regional/{level}/{geoid}
+//   #/national/{level}/{mode}/{metricOrIndustry}
+//   #/industry-space/{level}
+
+function updateHash(tab, params) {
+  const parts = [tab, ...params].map(encodeURIComponent);
+  history.replaceState(null, '', '#/' + parts.join('/'));
+}
+
+function parseHash() {
+  const hash = window.location.hash;
+  if (!hash || !hash.startsWith('#/')) return null;
+  const parts = hash.slice(2).split('/').map(decodeURIComponent);
+  return { tab: parts[0], params: parts.slice(1) };
+}
+
+async function applyHash() {
+  const parsed = parseHash();
+  if (!parsed) return;
+  const { tab, params } = parsed;
+
+  if (tab === 'regional' && params.length >= 2) {
+    const [level, geoid] = params;
+    // Switch tab
+    document.querySelector('[data-tab="regional"]').click();
+    document.getElementById('reg-level').value = level;
+    populateRegGeoList();
+    const paddedGeoid = padGeoid(geoid, level);
+    const geoName = level === 'county' ? getCountyDisplayName(paddedGeoid) : getGeoName(geoid, level);
+    if (regGeoWidget) regGeoWidget.setValue(paddedGeoid, geoName);
+    regSelectedGeo = paddedGeoid;
+    await loadRegional(level, paddedGeoid);
+  } else if (tab === 'national' && params.length >= 3) {
+    const [level, mode, metricOrIndustry] = params;
+    document.querySelector('[data-tab="national"]').click();
+    document.getElementById('nat-level').value = level;
+    updateNatStateFilter();
+    document.getElementById('nat-mode').value = mode;
+    document.getElementById('nat-mode').dispatchEvent(new Event('change'));
+    if (mode === 'industry') {
+      if (natIndWidget && metricOrIndustry) {
+        const desc = industryTitles ? industryTitles.get(metricOrIndustry) : metricOrIndustry;
+        natIndWidget.setValue(metricOrIndustry, metricOrIndustry + ' - ' + (desc || ''));
+      }
+      if (params[3]) document.getElementById('nat-metric').value = params[3];
+    } else {
+      if (metricOrIndustry) document.getElementById('nat-geo-metric').value = metricOrIndustry;
+    }
+    await loadNational();
+  } else if (tab === 'industry-space') {
+    document.querySelector('[data-tab="industry-space"]').click();
+    if (params[0]) document.getElementById('is-level').value = params[0];
+    await loadIndustrySpace();
+  }
+}
+
+// Update hash when navigating (hook into existing functions)
+const _origLoadRegional = loadRegional;
+loadRegional = async function(level, geoid) {
+  updateHash('regional', [level, geoid]);
+  return _origLoadRegional(level, geoid);
+};
+
+const _origLoadNational = loadNational;
+loadNational = async function() {
+  const level = document.getElementById('nat-level').value;
+  const mode = document.getElementById('nat-mode').value;
+  if (mode === 'industry') {
+    const indCode = natIndWidget ? natIndWidget.getValue() : '';
+    const metric = document.getElementById('nat-metric').value;
+    updateHash('national', [level, mode, indCode || '', metric]);
+  } else {
+    const metric = document.getElementById('nat-geo-metric').value;
+    updateHash('national', [level, mode, metric]);
+  }
+  return _origLoadNational();
+};
+
+const _origLoadIndustrySpace = loadIndustrySpace;
+loadIndustrySpace = async function() {
+  const level = document.getElementById('is-level').value;
+  updateHash('industry-space', [level]);
+  return _origLoadIndustrySpace();
+};
+
+// ════════════════════════════════════════════
+//  INIT
+// ════════════════════════════════════════════
 (async function init() {
   showSpinner();
-  try {
-    await initRegional();
-    await initNational();
-    await initIndustrySpace();
-  } catch (err) {
-    console.error('Init error:', err);
-  }
+  try { await initRegional(); } catch (err) { console.error('Regional init failed:', err); }
+  try { await initNational(); } catch (err) { console.error('National init failed:', err); }
+  try { await initIndustrySpace(); } catch (err) { console.error('Industry Space init failed:', err); }
+  // Apply deep link if present
+  try { await applyHash(); } catch (err) { console.error('Hash routing failed:', err); }
   hideSpinner();
 })();
 </script>
