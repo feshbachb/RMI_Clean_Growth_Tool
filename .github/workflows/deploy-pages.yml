@@ -4,8 +4,9 @@ on:
   push:
     branches:
       - main
+      - claude/load-rmi-data-Cq3G1
     paths:
-      - 'dashboard_data_*/**'
+      - 'docs/**'
       - '.github/workflows/deploy-pages.yml'
   workflow_dispatch:
 
@@ -34,7 +35,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: dashboard_data_20260308_204924
+          path: docs
 
       - name: Deploy to GitHub Pages
         id: deployment
