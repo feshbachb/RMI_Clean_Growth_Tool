@@ -40,6 +40,13 @@ body {
   box-shadow: 0 2px 8px rgba(0,0,0,.25);
   z-index: 100;
 }
+.header-logo {
+  display: flex;
+  align-items: center;
+  margin-right: 16px;
+  text-decoration: none;
+  flex-shrink: 0;
+}
 .header-title {
   font-size: 20px;
   font-weight: 700;
@@ -270,6 +277,53 @@ body {
 
 /* range label */
 .range-label { display: flex; justify-content: space-between; font-size: 12px; color: #999; margin-top: -8px; margin-bottom: 8px; }
+
+/* ── Map ── */
+.map-container {
+  background: var(--white);
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  padding: 16px;
+  margin-bottom: 20px;
+}
+.map-description {
+  font-size: 13px;
+  font-style: italic;
+  color: #666;
+  line-height: 1.5;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--light-gray);
+}
+.map-actions {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+  font-size: 13px;
+}
+.map-actions a {
+  color: var(--energy-dark);
+  text-decoration: none;
+  cursor: pointer;
+}
+.map-actions a:hover { text-decoration: underline; }
+
+/* ── Footer ── */
+.site-footer {
+  background: var(--white);
+  border-top: 2px solid var(--light-gray);
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  font-size: 13px;
+  color: var(--basalt);
+}
+.footer-left { display: flex; align-items: center; gap: 8px; }
+.footer-left a { color: var(--energy-dark); text-decoration: none; }
+.footer-left a:hover { text-decoration: underline; }
+.footer-right svg { display: block; }
 </style>
 </head>
 <body>
@@ -279,12 +333,19 @@ body {
 
 <!-- Header -->
 <div class="header">
-  <div class="header-title">RMI Clean Growth Tool</div>
+  <a href="https://rmi.org" target="_blank" rel="noopener" class="header-logo" aria-label="RMI Home">
+    <svg viewBox="0 0 120 40" width="90" height="32" fill="white" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <polygon points="0,38 16,6 32,38" fill="none" stroke="white" stroke-width="3" stroke-linejoin="round"/>
+      <polygon points="20,38 36,6 52,38" fill="none" stroke="white" stroke-width="3" stroke-linejoin="round"/>
+      <text x="60" y="32" font-family="Source Sans Pro, Arial, sans-serif" font-weight="700" font-size="28" fill="white">RMI</text>
+    </svg>
+  </a>
+  <div class="header-title">Clean Growth Tool</div>
   <div class="header-subtitle">Economic Complexity Dashboard</div>
   <div class="tab-bar">
-    <button class="tab-btn active" data-tab="regional">Regional View</button>
-    <button class="tab-btn" data-tab="national">National View</button>
-    <button class="tab-btn" data-tab="industry-space">Industry Space</button>
+    <button class="tab-btn active" data-tab="regional" role="tab" aria-selected="true">Regional View</button>
+    <button class="tab-btn" data-tab="national" role="tab" aria-selected="false">National View</button>
+    <button class="tab-btn" data-tab="industry-space" role="tab" aria-selected="false">Industry Space</button>
   </div>
 </div>
 
@@ -393,6 +454,20 @@ body {
   </div>
 </div>
 
+<!-- Footer -->
+<div class="site-footer">
+  <div class="footer-left">
+    <strong>Source:</strong> <a href="https://rmi.org" target="_blank" rel="noopener">RMI Clean Growth Tool</a>
+  </div>
+  <div class="footer-right">
+    <svg viewBox="0 0 120 40" width="72" height="26" xmlns="http://www.w3.org/2000/svg" aria-label="RMI">
+      <polygon points="0,38 16,6 32,38" fill="none" stroke="#003B63" stroke-width="3" stroke-linejoin="round"/>
+      <polygon points="20,38 36,6 52,38" fill="none" stroke="#003B63" stroke-width="3" stroke-linejoin="round"/>
+      <text x="60" y="32" font-family="Source Sans Pro, Arial, sans-serif" font-weight="700" font-size="28" fill="#003B63">RMI</text>
+    </svg>
+  </div>
+</div>
+
 <script>
 // ════════════════════════════════════════════
 //  GLOBALS & CACHE
@@ -410,6 +485,21 @@ let metaGeo = null;        // rows from geography_specific
 let metaIndustry = null;   // rows from industry_specific
 let industryTitles = null; // Map code->desc
 let crosswalk = null;
+
+// Map infrastructure
+let countyGeoJSON = null;        // GeoJSON FeatureCollection for US counties
+let stateFipsToAbbr = null;      // Map: "01" -> "AL"
+let countyToParent = null;       // Map: countyGeoid -> { cbsa: {geoid,name}, csa: {geoid,name}, cz: {geoid,name} }
+const COUNTY_GEOJSON_URL = 'https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json';
+
+const RMI_COLORSCALE = [
+  [0, '#E0F7F6'],
+  [0.2, '#A8EDEA'],
+  [0.4, '#45CFCC'],
+  [0.6, '#1A8F96'],
+  [0.8, '#0B5F7C'],
+  [1, '#003B63']
+];
 
 // ════════════════════════════════════════════
 //  UTILITIES
@@ -447,6 +537,36 @@ function fmt(v, decimals) {
 }
 function fmtPct(v) { return v == null || isNaN(v) ? '—' : Number(v).toFixed(1) + '%'; }
 function fmtInt(v) { return v == null || isNaN(v) ? '—' : Math.round(v).toLocaleString(); }
+
+async function fetchGeoJSON() {
+  if (countyGeoJSON) return countyGeoJSON;
+  performance.mark('geojson-start');
+  const resp = await fetch(COUNTY_GEOJSON_URL);
+  if (!resp.ok) throw new Error('Failed to fetch county GeoJSON');
+  countyGeoJSON = await resp.json();
+  performance.mark('geojson-end');
+  performance.measure('GeoJSON load', 'geojson-start', 'geojson-end');
+  return countyGeoJSON;
+}
+
+function buildCrosswalkMaps() {
+  if (!crosswalk || stateFipsToAbbr) return;
+  stateFipsToAbbr = new Map();
+  countyToParent = new Map();
+  crosswalk.forEach(r => {
+    const sf = String(r.state_fips).padStart(2, '0');
+    if (r.state_abbreviation) stateFipsToAbbr.set(sf, r.state_abbreviation);
+    const countyId = String(r.county_geoid).padStart(5, '0');
+    countyToParent.set(countyId, {
+      cbsa: r.county_in_cbsa === true || r.county_in_cbsa === 'True' ? { geoid: String(r.cbsa_geoid), name: r.cbsa_name } : null,
+      csa: r.county_in_csa === true || r.county_in_csa === 'True' ? { geoid: String(r.csa_geoid), name: r.csa_name } : null,
+      cz: { geoid: String(r.commuting_zone_geoid), name: r.commuting_zone_name },
+      state_fips: sf,
+      state_abbr: r.state_abbreviation,
+      county_name: r.county_name
+    });
+  });
+}
 
 // ════════════════════════════════════════════
 //  SEARCH-SELECT WIDGET
@@ -580,6 +700,7 @@ async function ensureMeta() {
     rows.forEach(r => industryTitles.set(String(r.industry_code), r.industry_description));
   }
   if (!crosswalk) crosswalk = await fetchCSV('meta/crosswalk.csv');
+  buildCrosswalkMaps();
 }
 
 async function ensureIndustryMeta() {
@@ -607,9 +728,10 @@ function getGeoRecord(geoid, levelName) {
 // ════════════════════════════════════════════
 document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-selected', 'false'); });
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     btn.classList.add('active');
+    btn.setAttribute('aria-selected', 'true');
     document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
   });
 });
@@ -822,6 +944,155 @@ document.getElementById('nat-mode').addEventListener('change', () => {
 
 document.getElementById('nat-load').addEventListener('click', loadNational);
 
+// ── Map rendering helpers ──
+
+const METRIC_DESCRIPTIONS = {
+  economic_complexity_index: 'The Economic Complexity Index (ECI) measures the diversity and sophistication of a region\'s productive capabilities, based on the industries in which it has revealed comparative advantage.',
+  economic_complexity_percentile_score: 'Percentile ranking of each region\'s Economic Complexity Index relative to all regions at the same geographic level.',
+  industrial_diversity: 'Count of distinct six-digit NAICS industries in which the region has measurable employment.',
+  strategic_index: 'The Strategic Index captures the potential for a region to improve its economic complexity through feasible industry development.',
+  strategic_index_percentile: 'Percentile ranking of each region\'s Strategic Index relative to all regions at the same geographic level.',
+  location_quotient: 'Location Quotient (LQ) measures the concentration of industry employment in each region relative to the national average. LQ > 1 indicates specialization.',
+  industry_feasibility_percentile_score: 'Percentile ranking of how feasible it is for each region to develop this industry, based on proximity to related industries already present.',
+  strategic_gain_percentile_score: 'Percentile ranking of the potential economic complexity gain from developing this industry in each region.',
+  industry_employment_share: 'Share of total regional employment accounted for by this industry.',
+  industry_present: 'Whether the industry has measurable employment in each region.'
+};
+
+function buildMapContainer(container, mapId, metricLabel, metricKey, level) {
+  const mapWrap = document.createElement('div');
+  mapWrap.className = 'map-container';
+
+  const mapTitle = document.createElement('div');
+  mapTitle.className = 'section-title';
+  mapTitle.textContent = metricLabel + ' by ' + LEVEL_LABEL[level];
+  mapWrap.appendChild(mapTitle);
+
+  const plotEl = document.createElement('div');
+  plotEl.id = mapId;
+  mapWrap.appendChild(plotEl);
+
+  const desc = document.createElement('div');
+  desc.className = 'map-description';
+  desc.textContent = METRIC_DESCRIPTIONS[metricKey] || ('Geographic distribution of ' + metricLabel + ' across ' + LEVEL_LABEL[level] + '-level regions.');
+  mapWrap.appendChild(desc);
+
+  const actions = document.createElement('div');
+  actions.className = 'map-actions';
+  const dlImg = document.createElement('a');
+  dlImg.textContent = 'Download image';
+  dlImg.addEventListener('click', () => Plotly.downloadImage(plotEl, { format: 'png', width: 1200, height: 800, filename: metricKey + '_' + level + '_map' }));
+  actions.appendChild(dlImg);
+  mapWrap.appendChild(actions);
+
+  container.appendChild(mapWrap);
+  return plotEl;
+}
+
+async function renderStateMap(plotEl, geos, metricKey, metricLabel) {
+  const locations = [];
+  const z = [];
+  const hoverText = [];
+  geos.forEach(g => {
+    const fips = String(g.geoid).padStart(2, '0');
+    const abbr = stateFipsToAbbr ? stateFipsToAbbr.get(fips) : null;
+    if (!abbr || g[metricKey] == null) return;
+    locations.push(abbr);
+    z.push(g[metricKey]);
+    hoverText.push(g.name + '<br>' + metricLabel + ': ' + fmt(g[metricKey]));
+  });
+
+  Plotly.newPlot(plotEl, [{
+    type: 'choropleth',
+    locationmode: 'USA-states',
+    locations: locations,
+    z: z,
+    text: hoverText,
+    hoverinfo: 'text',
+    colorscale: RMI_COLORSCALE,
+    colorbar: { title: { text: metricLabel, font: { size: 12 } }, thickness: 15, len: 0.6 },
+    marker: { line: { color: 'white', width: 1 } }
+  }], {
+    geo: {
+      scope: 'usa',
+      showlakes: false,
+      bgcolor: 'rgba(0,0,0,0)',
+      lakecolor: 'rgba(0,0,0,0)'
+    },
+    margin: { t: 10, r: 10, b: 10, l: 10 },
+    height: 480,
+    font: { family: 'Source Sans Pro, Roboto, sans-serif' }
+  }, { responsive: true });
+}
+
+async function renderCountyMap(plotEl, dataMap, metricKey, metricLabel, level, parentGeoMap) {
+  // dataMap: Map of geoid -> metric value (at the source level)
+  // parentGeoMap: Map of geoid -> name (for tooltip of parent region)
+  // For county level, dataMap keys are county FIPS directly
+  // For CBSA/CSA/CZ, we map each county to its parent's value via crosswalk
+
+  const geojson = await fetchGeoJSON();
+  const locations = [];
+  const z = [];
+  const hoverText = [];
+
+  if (level === 'county') {
+    geojson.features.forEach(f => {
+      const fips = f.id;
+      if (dataMap.has(fips)) {
+        locations.push(fips);
+        z.push(dataMap.get(fips));
+        const parent = countyToParent ? countyToParent.get(fips) : null;
+        const countyName = parent ? parent.county_name : fips;
+        hoverText.push(countyName + '<br>' + metricLabel + ': ' + fmt(dataMap.get(fips)));
+      }
+    });
+  } else {
+    // Map counties to their parent region value
+    const parentKey = level === 'cbsa' ? 'cbsa' : level === 'csa' ? 'csa' : 'cz';
+    geojson.features.forEach(f => {
+      const fips = f.id;
+      const parent = countyToParent ? countyToParent.get(fips) : null;
+      if (!parent) return;
+      const parentInfo = parent[parentKey];
+      if (!parentInfo || !parentInfo.geoid) return;
+      const val = dataMap.get(String(parentInfo.geoid));
+      if (val == null) return;
+      locations.push(fips);
+      z.push(val);
+      const countyName = parent.county_name || fips;
+      const parentName = parentInfo.name || parentInfo.geoid;
+      hoverText.push(countyName + '<br>' + LEVEL_LABEL[level] + ': ' + parentName + '<br>' + metricLabel + ': ' + fmt(val));
+    });
+  }
+
+  if (locations.length === 0) return;
+
+  Plotly.newPlot(plotEl, [{
+    type: 'choropleth',
+    geojson: geojson,
+    locations: locations,
+    z: z,
+    text: hoverText,
+    hoverinfo: 'text',
+    colorscale: RMI_COLORSCALE,
+    colorbar: { title: { text: metricLabel, font: { size: 12 } }, thickness: 15, len: 0.6 },
+    marker: { line: { color: 'rgba(255,255,255,0.3)', width: 0.3 } }
+  }], {
+    geo: {
+      scope: 'usa',
+      showlakes: false,
+      bgcolor: 'rgba(0,0,0,0)',
+      lakecolor: 'rgba(0,0,0,0)',
+      subunitcolor: 'rgba(0,0,0,0.15)',
+      showsubunits: true
+    },
+    margin: { t: 10, r: 10, b: 10, l: 10 },
+    height: 520,
+    font: { family: 'Source Sans Pro, Roboto, sans-serif' }
+  }, { responsive: true });
+}
+
 async function loadNational() {
   const level = document.getElementById('nat-level').value;
   const mode = document.getElementById('nat-mode').value;
@@ -838,12 +1109,29 @@ async function loadNational() {
       const metricLabel = document.getElementById('nat-geo-metric').selectedOptions[0].text;
       const geos = getGeosByLevel(level);
 
+      // ── Choropleth Map ──
+      const mapPlotEl = buildMapContainer(container, 'nat-geo-map', metricLabel, metricKey, level);
+
+      if (level === 'state') {
+        await renderStateMap(mapPlotEl, geos, metricKey, metricLabel);
+      } else {
+        // Build dataMap: geoid -> metric value (pad FIPS codes)
+        const dataMap = new Map();
+        const padLen = level === 'county' ? 5 : 0;
+        geos.forEach(g => {
+          const id = padLen ? String(g.geoid).padStart(padLen, '0') : String(g.geoid);
+          dataMap.set(id, g[metricKey]);
+        });
+        await renderCountyMap(mapPlotEl, dataMap, metricKey, metricLabel, level, null);
+      }
+
       // Summary stats
       const vals = geos.map(g => g[metricKey]).filter(v => v != null && !isNaN(v));
       const avg = vals.reduce((s, v) => s + v, 0) / vals.length;
-      const min = Math.min(...vals);
-      const max = Math.max(...vals);
-      const median = vals.sort((a, b) => a - b)[Math.floor(vals.length / 2)];
+      const sorted = [...vals].sort((a, b) => a - b);
+      const min = sorted[0];
+      const max = sorted[sorted.length - 1];
+      const median = sorted[Math.floor(sorted.length / 2)];
 
       const cardsDiv = document.createElement('div');
       cardsDiv.className = 'cards';
@@ -905,16 +1193,39 @@ async function loadNational() {
         geo_name: geoMap.get(String(r.geoid)) || String(r.geoid)
       }));
 
+      const titleEl = document.createElement('h2');
+      titleEl.style.cssText = 'color:var(--blue-spruce);margin-bottom:16px;';
+      titleEl.textContent = indCode + ' - ' + indDesc;
+      container.appendChild(titleEl);
+
+      // ── Choropleth Map for industry ──
+      if (metricKey !== 'industry_present') {
+        const mapPlotEl = buildMapContainer(container, 'nat-ind-map', metricLabel + ' — ' + indDesc, metricKey, level);
+        const dataMap = new Map();
+        const padLen = level === 'county' ? 5 : level === 'state' ? 2 : 0;
+        rows.forEach(r => {
+          const id = padLen ? String(r.geoid).padStart(padLen, '0') : String(r.geoid);
+          dataMap.set(id, r[metricKey]);
+        });
+
+        if (level === 'state') {
+          // Build pseudo-geo objects for state map
+          const pseudoGeos = rows.map(r => ({
+            geoid: r.geoid,
+            name: r.geo_name,
+            [metricKey]: r[metricKey]
+          }));
+          await renderStateMap(mapPlotEl, pseudoGeos, metricKey, metricLabel);
+        } else {
+          await renderCountyMap(mapPlotEl, dataMap, metricKey, metricLabel, level, geoMap);
+        }
+      }
+
       // Summary stats
       const vals = rows.map(r => r[metricKey]).filter(v => v != null && !isNaN(v));
       const avg = vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : 0;
       const present = rows.filter(r => r.industry_present === 1).length;
       const rca = rows.filter(r => r.industry_comparative_advantage === 1).length;
-
-      const titleEl = document.createElement('h2');
-      titleEl.style.cssText = 'color:var(--blue-spruce);margin-bottom:16px;';
-      titleEl.textContent = indCode + ' - ' + indDesc;
-      container.appendChild(titleEl);
 
       const cardsDiv = document.createElement('div');
       cardsDiv.className = 'cards';
