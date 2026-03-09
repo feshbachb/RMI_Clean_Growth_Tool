@@ -358,20 +358,20 @@ body {
   <div class="header-title">Clean Growth Tool</div>
   <div class="header-subtitle">Economic Complexity Dashboard</div>
   <div class="tab-bar">
-    <button class="tab-btn active" data-tab="regional" role="tab" aria-selected="true">Regional View</button>
-    <button class="tab-btn" data-tab="national" role="tab" aria-selected="false">National View</button>
+    <button class="tab-btn" data-tab="regional" role="tab" aria-selected="false">Regional View</button>
+    <button class="tab-btn active" data-tab="national" role="tab" aria-selected="true">National View</button>
     <button class="tab-btn" data-tab="industry-space" role="tab" aria-selected="false">Industry Space</button>
   </div>
 </div>
 
 <!-- ═══════════════ TAB 1: Regional ═══════════════ -->
-<div class="tab-panel active" id="panel-regional">
+<div class="tab-panel" id="panel-regional">
   <div class="sidebar" id="sidebar-regional">
     <h3>Geography</h3>
     <label for="reg-level">Level</label>
     <select id="reg-level">
-      <option value="county">County</option>
-      <option value="state" selected>State</option>
+      <option value="county" selected>County</option>
+      <option value="state">State</option>
       <option value="cbsa">Metropolitan Statistical Area</option>
       <option value="csa">Combined Statistical Area</option>
       <option value="cz">Commuting Zone</option>
@@ -389,13 +389,13 @@ body {
 </div>
 
 <!-- ═══════════════ TAB 2: National ═══════════════ -->
-<div class="tab-panel" id="panel-national">
+<div class="tab-panel active" id="panel-national">
   <div class="sidebar" id="sidebar-national">
     <h3>Filters</h3>
     <label for="nat-level">Geography Level</label>
     <select id="nat-level">
-      <option value="county">County</option>
-      <option value="state" selected>State</option>
+      <option value="county" selected>County</option>
+      <option value="state">State</option>
       <option value="cbsa">Metropolitan Statistical Area</option>
       <option value="csa">Combined Statistical Area</option>
       <option value="cz">Commuting Zone</option>
@@ -421,7 +421,7 @@ body {
         <option value="industry_present">Industry Presence</option>
         <option value="location_quotient">Location Quotient</option>
         <option value="industry_comparative_advantage">Comparative Advantage</option>
-        <option value="industry_feasibility">Industry Feasibility</option>
+        <option value="industry_feasibility" selected>Industry Feasibility</option>
         <option value="industry_feasibility_percentile_score">Industry Feasibility Percentile</option>
         <option value="strategic_gain">Strategic Gain</option>
         <option value="strategic_gain_percentile_score">Strategic Gain Percentile</option>
@@ -456,8 +456,8 @@ body {
     <h3>Network Settings</h3>
     <label for="is-level">Geography Level</label>
     <select id="is-level">
-      <option value="county">County</option>
-      <option value="state" selected>State</option>
+      <option value="county" selected>County</option>
+      <option value="state">State</option>
       <option value="cbsa">Metropolitan Statistical Area</option>
       <option value="csa">Combined Statistical Area</option>
       <option value="cz">Commuting Zone</option>
@@ -1078,6 +1078,9 @@ async function initNational() {
   await ensureIndustryMeta();
   populateNatIndustryList();
   updateNatStateFilter();
+  // Pre-select 335910 (Battery Manufacturing) and auto-load
+  if (natIndWidget) natIndWidget.setValue('335910', '335910 - ' + (industryTitles.get('335910') || 'Battery Manufacturing'));
+  await loadNational();
 }
 
 function populateNatIndustryList() {
@@ -1281,6 +1284,7 @@ async function loadNational() {
   showSpinner();
 
   try {
+    if (!metaGeo) metaGeo = await fetchCSV('meta/geography_specific.csv');
     const container = document.getElementById('nat-results');
     container.innerHTML = '';
     container.style.display = '';
@@ -1425,7 +1429,7 @@ async function loadNational() {
       container.appendChild(titleEl);
 
       // ── Choropleth Map for industry ──
-      if (metricKey !== 'industry_present') {
+      {
         const mapPlotEl = buildMapContainer(container, 'nat-ind-map', metricLabel + ' — ' + indDesc, metricKey, level, () => ({
           rows: rows,
           columns: [
