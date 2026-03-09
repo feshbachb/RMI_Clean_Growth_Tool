@@ -1,0 +1,6 @@
+geo_aggregation_level,geo_aggregation_name,n_geographies,n_industries,fill_rate_pct,first_eigenvalue,second_eigenvalue,eigenvalue_gap_l2_l3,ici_ubiquity_correlation,eci_diversity_correlation,eci_avgici_correlation,ici_sign_flipped,eci_sign_flipped,min_ubiquity,n_excluded_naics,n_dropped_below_min,state_eci_method,state_ici_method
+1,county,3143,946,13.87,1,0.160343,0.066336,-0.6854,0.8207,1,FALSE,FALSE,3,1,0,native_eigenvector,native_eigenvector
+2,state,51,946,33.1,1,0.20437,0.063329,-0.1715,-0.4683,1,TRUE,TRUE,3,1,0,county_aggregated_empwt,county_ici_proxy
+3,cbsa,925,946,18.45,1,0.126631,0.02325,-0.5177,0.6427,1,FALSE,FALSE,3,1,0,native_eigenvector,native_eigenvector
+4,csa,181,946,25.78,1,0.135313,0.022596,-0.4054,0.3285,1,FALSE,FALSE,3,1,0,native_eigenvector,native_eigenvector
+5,commuting_zone,588,946,20.31,1,0.150725,0.016028,-0.6263,0.6809,1,FALSE,FALSE,3,1,0,native_eigenvector,native_eigenvector
