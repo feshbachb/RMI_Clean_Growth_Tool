@@ -540,7 +540,19 @@ const CB_PAIRED = ['#a6cee3','#1f78b4','#b2df8a','#33a02c','#fb9a99','#e31a1c','
 
 // Use consistent sequential color scale for all metrics
 function getColorScale(metricKey) {
+  const binaryMetrics = ['industry_present', 'industry_comparative_advantage', 'strategic_gain_possible'];
+  if (binaryMetrics.includes(metricKey)) return [[0, '#f0f0f0'], [1, '#2c7bb6']];
   return CB_YLGNBU;
+}
+
+// Compute percentile-based zmin/zmax to prevent outlier compression
+function percentileClip(values, lo, hi) {
+  if (!values.length) return { zmin: 0, zmax: 1 };
+  const sorted = values.slice().sort((a, b) => a - b);
+  const pLo = sorted[Math.floor(sorted.length * lo)];
+  const pHi = sorted[Math.min(sorted.length - 1, Math.ceil(sorted.length * hi))];
+  if (pLo === pHi) return { zmin: sorted[0], zmax: sorted[sorted.length - 1] };
+  return { zmin: pLo, zmax: pHi };
 }
 
 // ── RMI logo overlay for Plotly layouts ──
@@ -1163,11 +1175,14 @@ async function renderStateMap(plotEl, geos, metricKey, metricLabel) {
     hoverText.push(g.name + '<br>' + metricLabel + ': ' + fmt(g[metricKey]));
   });
 
+  const clip = percentileClip(z, 0.02, 0.98);
   Plotly.newPlot(plotEl, [{
     type: 'choropleth',
     locationmode: 'USA-states',
     locations: locations,
     z: z,
+    zmin: clip.zmin,
+    zmax: clip.zmax,
     text: hoverText,
     hoverinfo: 'text',
     colorscale: getColorScale(metricKey),
@@ -1228,11 +1243,14 @@ async function renderCountyMap(plotEl, dataMap, metricKey, metricLabel, level, p
 
   if (locations.length === 0) return;
 
+  const clip = percentileClip(z, 0.02, 0.98);
   Plotly.newPlot(plotEl, [{
     type: 'choropleth',
     geojson: geojson,
     locations: locations,
     z: z,
+    zmin: clip.zmin,
+    zmax: clip.zmax,
     text: hoverText,
     hoverinfo: 'text',
     colorscale: getColorScale(metricKey),
