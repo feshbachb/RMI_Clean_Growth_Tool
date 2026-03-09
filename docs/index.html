@@ -1261,10 +1261,9 @@ async function renderCountyMap(plotEl, dataMap, metricKey, metricLabel, level, p
   plotEl.offsetHeight;
   await new Promise(r => requestAnimationFrame(r));
   Plotly.newPlot(plotEl, [{
-    type: 'choropleth',
+    type: 'choroplethmapbox',
     geojson: geojson,
     featureidkey: 'id',
-    locationmode: 'geojson-id',
     locations: locations,
     z: z,
     zmin: clip.zmin,
@@ -1273,22 +1272,13 @@ async function renderCountyMap(plotEl, dataMap, metricKey, metricLabel, level, p
     hoverinfo: 'text',
     colorscale: getColorScale(metricKey),
     colorbar: { title: { text: metricLabel, font: { size: 12 } }, thickness: 15, len: 0.6 },
-    marker: { line: { color: 'rgba(180,180,180,0.6)', width: 0.3 } }
+    marker: { line: { color: 'rgba(100,100,100,0.5)', width: 0.5 }, opacity: 0.85 }
   }], {
-    geo: {
-      scope: 'usa',
-      projection: { type: 'albers usa' },
-      showlakes: true,
-      lakecolor: 'rgba(180,210,230,0.4)',
-      bgcolor: 'rgba(0,0,0,0)',
-      showland: true,
-      landcolor: '#f5f5f5',
-      subunitcolor: 'rgba(0,0,0,0.4)',
-      subunitwidth: 1,
-      showsubunits: true,
-      showframe: false
+    mapbox: {
+      style: 'carto-positron',
+      center: { lat: 39.5, lon: -98.35 },
+      zoom: 3.2
     },
-    images: rmiLogoImages(),
     margin: { t: 10, r: 10, b: 10, l: 10 },
     width: plotEl.clientWidth || undefined,
     height: 520,
