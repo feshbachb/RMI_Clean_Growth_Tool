@@ -8,6 +8,7 @@
 <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -371,8 +372,8 @@ body {
     <select id="reg-level">
       <option value="county">County</option>
       <option value="state" selected>State</option>
-      <option value="cbsa">CBSA (Metro Area)</option>
-      <option value="csa">CSA</option>
+      <option value="cbsa">Metropolitan Statistical Area</option>
+      <option value="csa">Combined Statistical Area</option>
       <option value="cz">Commuting Zone</option>
     </select>
     <label>Search Geography</label>
@@ -395,10 +396,16 @@ body {
     <select id="nat-level">
       <option value="county">County</option>
       <option value="state" selected>State</option>
-      <option value="cbsa">CBSA (Metro Area)</option>
-      <option value="csa">CSA</option>
+      <option value="cbsa">Metropolitan Statistical Area</option>
+      <option value="csa">Combined Statistical Area</option>
       <option value="cz">Commuting Zone</option>
     </select>
+    <div id="nat-state-filter-wrap" style="display:none">
+      <label for="nat-state-filter">Filter by State</label>
+      <select id="nat-state-filter">
+        <option value="">All States</option>
+      </select>
+    </div>
     <label for="nat-mode">Mode</label>
     <select id="nat-mode">
       <option value="industry">Industry Metrics</option>
@@ -413,16 +420,20 @@ body {
       <select id="nat-metric">
         <option value="industry_present">Industry Presence</option>
         <option value="location_quotient">Location Quotient</option>
-        <option value="industry_feasibility_percentile_score">Feasibility Percentile</option>
+        <option value="industry_comparative_advantage">Comparative Advantage</option>
+        <option value="industry_feasibility">Industry Feasibility</option>
+        <option value="industry_feasibility_percentile_score">Industry Feasibility Percentile</option>
+        <option value="strategic_gain">Strategic Gain</option>
         <option value="strategic_gain_percentile_score">Strategic Gain Percentile</option>
+        <option value="strategic_gain_possible">Strategic Gain Possible</option>
         <option value="industry_employment_share">Employment Share</option>
       </select>
     </div>
     <div id="nat-geo-metric-wrap" style="display:none">
       <label for="nat-geo-metric">Metric</label>
       <select id="nat-geo-metric">
-        <option value="economic_complexity_index">ECI</option>
-        <option value="economic_complexity_percentile_score">ECI Percentile</option>
+        <option value="economic_complexity_index">Economic Complexity Index</option>
+        <option value="economic_complexity_percentile_score">Economic Complexity Index Percentile</option>
         <option value="industrial_diversity">Industrial Diversity</option>
         <option value="strategic_index">Strategic Index</option>
         <option value="strategic_index_percentile">Strategic Index Percentile</option>
@@ -447,8 +458,8 @@ body {
     <select id="is-level">
       <option value="county">County</option>
       <option value="state" selected>State</option>
-      <option value="cbsa">CBSA (Metro Area)</option>
-      <option value="csa">CSA</option>
+      <option value="cbsa">Metropolitan Statistical Area</option>
+      <option value="csa">Combined Statistical Area</option>
       <option value="cz">Commuting Zone</option>
     </select>
     <label for="is-threshold">Edge Proximity Threshold (top %)</label>
@@ -489,7 +500,7 @@ const BASE = (() => {
 
 const CACHE = new Map();
 const LEVEL_MAP = { county: 1, state: 2, cbsa: 3, csa: 4, cz: 5 };
-const LEVEL_LABEL = { county:'County', state:'State', cbsa:'CBSA', csa:'CSA', cz:'Commuting Zone' };
+const LEVEL_LABEL = { county:'County', state:'State', cbsa:'Metropolitan Statistical Area', csa:'Combined Statistical Area', cz:'Commuting Zone' };
 
 let metaGeo = null;        // rows from geography_specific
 let metaIndustry = null;   // rows from industry_specific
@@ -500,7 +511,7 @@ let crosswalk = null;
 let countyGeoJSON = null;        // GeoJSON FeatureCollection for US counties
 let stateFipsToAbbr = null;      // Map: "01" -> "AL"
 let countyToParent = null;       // Map: countyGeoid -> { cbsa: {geoid,name}, csa: {geoid,name}, cz: {geoid,name} }
-const COUNTY_GEOJSON_URL = 'https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json';
+const COUNTY_GEOJSON_URL = 'us-counties-ct-planning.json';
 
 // ColorBrewer palettes
 const CB_YLGNBU = [
@@ -527,11 +538,8 @@ const CB_RDYLBU = [
 ];
 const CB_PAIRED = ['#a6cee3','#1f78b4','#b2df8a','#33a02c','#fb9a99','#e31a1c','#fdbf6f','#ff7f00','#cab2d6'];
 
-// Choose scale based on metric: diverging for ECI/strategic index, sequential for everything else
+// Use consistent sequential color scale for all metrics
 function getColorScale(metricKey) {
-  if (metricKey === 'economic_complexity_index' || metricKey === 'strategic_index') {
-    return CB_RDYLBU;
-  }
   return CB_YLGNBU;
 }
 
@@ -627,7 +635,7 @@ function fmtInt(v) { return v == null || isNaN(v) ? '—' : Math.round(v).toLoca
 async function fetchGeoJSON() {
   if (countyGeoJSON) return countyGeoJSON;
   performance.mark('geojson-start');
-  const resp = await fetch(COUNTY_GEOJSON_URL);
+  const resp = await fetch(BASE + COUNTY_GEOJSON_URL);
   if (!resp.ok) throw new Error('Failed to fetch county GeoJSON');
   countyGeoJSON = await resp.json();
   performance.mark('geojson-end');
@@ -635,13 +643,19 @@ async function fetchGeoJSON() {
   return countyGeoJSON;
 }
 
+let stateList = null; // [{fips, abbr, name}] sorted by name
+
 function buildCrosswalkMaps() {
   if (!crosswalk || stateFipsToAbbr) return;
   stateFipsToAbbr = new Map();
   countyToParent = new Map();
+  const stateSet = new Map();
   crosswalk.forEach(r => {
     const sf = String(r.state_fips).padStart(2, '0');
-    if (r.state_abbreviation) stateFipsToAbbr.set(sf, r.state_abbreviation);
+    if (r.state_abbreviation) {
+      stateFipsToAbbr.set(sf, r.state_abbreviation);
+      if (!stateSet.has(sf)) stateSet.set(sf, { fips: sf, abbr: r.state_abbreviation, name: r.state_name || r.state_abbreviation });
+    }
     const countyId = String(r.county_geoid).padStart(5, '0');
     countyToParent.set(countyId, {
       cbsa: r.county_in_cbsa === true || r.county_in_cbsa === 'True' ? { geoid: String(r.cbsa_geoid), name: r.cbsa_name } : null,
@@ -649,9 +663,22 @@ function buildCrosswalkMaps() {
       cz: { geoid: String(r.commuting_zone_geoid), name: r.commuting_zone_name },
       state_fips: sf,
       state_abbr: r.state_abbreviation,
+      state_name: r.state_name || r.state_abbreviation,
       county_name: r.county_name
     });
   });
+  stateList = Array.from(stateSet.values()).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function getCountyDisplayName(countyFips) {
+  const parent = countyToParent ? countyToParent.get(countyFips) : null;
+  if (parent) return (parent.county_name || countyFips) + ', ' + (parent.state_abbr || '');
+  return countyFips;
+}
+
+function getCountyStateFips(countyFips) {
+  const parent = countyToParent ? countyToParent.get(countyFips) : null;
+  return parent ? parent.state_fips : null;
 }
 
 // ════════════════════════════════════════════
@@ -839,7 +866,14 @@ async function initRegional() {
 function populateRegGeoList() {
   const level = document.getElementById('reg-level').value;
   const geos = getGeosByLevel(level);
-  const items = geos.map(g => ({ value: String(g.geoid), label: g.name })).sort((a, b) => a.label.localeCompare(b.label));
+  const items = geos.map(g => {
+    let label = g.name;
+    if (level === 'county') {
+      const fips = String(g.geoid).padStart(5, '0');
+      label = getCountyDisplayName(fips);
+    }
+    return { value: String(g.geoid), label: label };
+  }).sort((a, b) => a.label.localeCompare(b.label));
   regGeoWidget = createSearchSelect(
     document.getElementById('reg-geo-search'), items,
     'Search ' + LEVEL_LABEL[level] + '...',
@@ -872,7 +906,11 @@ async function loadRegional(level, geoid) {
     // Title
     const title = document.createElement('h2');
     title.style.cssText = 'color:var(--blue-spruce);margin-bottom:16px;font-size:24px;';
-    title.textContent = geoRec ? geoRec.name : geoid;
+    if (level === 'county' && geoRec) {
+      title.textContent = getCountyDisplayName(String(geoRec.geoid).padStart(5, '0'));
+    } else {
+      title.textContent = geoRec ? geoRec.name : geoid;
+    }
     container.appendChild(title);
 
     // Summary cards
@@ -900,30 +938,30 @@ async function loadRegional(level, geoid) {
     // Current Strengths
     const strengths = enriched.filter(r => r.industry_comparative_advantage === 1).sort((a, b) => (b.location_quotient || 0) - (a.location_quotient || 0));
     const t1 = document.createElement('div');
-    const h1 = document.createElement('div'); h1.className = 'section-title'; h1.textContent = 'Current Strengths (RCA \u2265 1)'; t1.appendChild(h1);
+    const h1 = document.createElement('div'); h1.className = 'section-title'; h1.textContent = 'Current Strengths (Comparative Advantage)'; t1.appendChild(h1);
     const tw1 = document.createElement('div'); t1.appendChild(tw1);
     renderSortableTable(tw1, [
       { key: 'industry_description', label: 'Industry' },
-      { key: 'industry_code', label: 'NAICS', align: 'center' },
+      { key: 'industry_code', label: 'Industry Code', align: 'center' },
       { key: 'location_quotient', label: 'Location Quotient', align: 'right', fmt: v => fmt(v, 3) },
       { key: 'industry_employment_share', label: 'Employment Share', align: 'right', fmt: v => v != null ? (v * 100).toFixed(3) + '%' : '—' },
-      { key: 'industry_complexity', label: 'Complexity', align: 'right', fmt: v => fmt(v) },
-      { key: 'industry_feasibility_percentile_score', label: 'Feasibility %ile', align: 'right', fmt: v => fmt(v, 1) }
+      { key: 'industry_complexity', label: 'Industry Complexity', align: 'right', fmt: v => fmt(v) },
+      { key: 'industry_feasibility_percentile_score', label: 'Feasibility Percentile', align: 'right', fmt: v => fmt(v, 1) }
     ], strengths, 'location_quotient', 'desc');
     container.appendChild(t1);
 
     // Growth Opportunities
     const growth = enriched.filter(r => r.industry_comparative_advantage === 0 && r.industry_feasibility_percentile_score >= 75).sort((a, b) => (b.industry_feasibility || 0) - (a.industry_feasibility || 0));
     const t2 = document.createElement('div');
-    const h2 = document.createElement('div'); h2.className = 'section-title'; h2.textContent = 'Growth Opportunities (No RCA, Feasibility \u2265 75th %ile)'; t2.appendChild(h2);
+    const h2 = document.createElement('div'); h2.className = 'section-title'; h2.textContent = 'Growth Opportunities (No Comparative Advantage, Feasibility \u2265 75th Percentile)'; t2.appendChild(h2);
     const tw2 = document.createElement('div'); t2.appendChild(tw2);
     renderSortableTable(tw2, [
       { key: 'industry_description', label: 'Industry' },
-      { key: 'industry_code', label: 'NAICS', align: 'center' },
+      { key: 'industry_code', label: 'Industry Code', align: 'center' },
       { key: 'industry_feasibility', label: 'Feasibility', align: 'right', fmt: v => fmt(v, 4) },
-      { key: 'industry_feasibility_percentile_score', label: 'Feasibility %ile', align: 'right', fmt: v => fmt(v, 1) },
-      { key: 'industry_complexity', label: 'Complexity', align: 'right', fmt: v => fmt(v) },
-      { key: 'industry_complexity_percentile', label: 'Complexity %ile', align: 'right', fmt: v => fmt(v, 1) }
+      { key: 'industry_feasibility_percentile_score', label: 'Feasibility Percentile', align: 'right', fmt: v => fmt(v, 1) },
+      { key: 'industry_complexity', label: 'Industry Complexity', align: 'right', fmt: v => fmt(v) },
+      { key: 'industry_complexity_percentile', label: 'Complexity Percentile', align: 'right', fmt: v => fmt(v, 1) }
     ], growth, 'industry_feasibility', 'desc');
     container.appendChild(t2);
 
@@ -934,11 +972,11 @@ async function loadRegional(level, geoid) {
     const tw3 = document.createElement('div'); t3.appendChild(tw3);
     renderSortableTable(tw3, [
       { key: 'industry_description', label: 'Industry' },
-      { key: 'industry_code', label: 'NAICS', align: 'center' },
+      { key: 'industry_code', label: 'Industry Code', align: 'center' },
       { key: 'strategic_gain', label: 'Strategic Gain', align: 'right', fmt: v => fmt(v, 4) },
-      { key: 'strategic_gain_percentile_score', label: 'Strat. Gain %ile', align: 'right', fmt: v => fmt(v, 1) },
+      { key: 'strategic_gain_percentile_score', label: 'Strategic Gain Percentile', align: 'right', fmt: v => fmt(v, 1) },
       { key: 'industry_feasibility', label: 'Feasibility', align: 'right', fmt: v => fmt(v, 4) },
-      { key: 'industry_complexity', label: 'Complexity', align: 'right', fmt: v => fmt(v) }
+      { key: 'industry_complexity', label: 'Industry Complexity', align: 'right', fmt: v => fmt(v) }
     ], strategic, 'strategic_gain_percentile_score', 'desc');
     container.appendChild(t3);
 
@@ -961,20 +999,20 @@ async function loadRegional(level, geoid) {
     const traceRCA = {
       x: rcaYes.map(r => r.industry_feasibility),
       y: rcaYes.map(r => r.industry_complexity),
-      text: rcaYes.map(r => r.industry_description + '<br>NAICS: ' + r.industry_code + '<br>LQ: ' + fmt(r.location_quotient, 2)),
+      text: rcaYes.map(r => r.industry_description + '<br>Industry Code: ' + r.industry_code + '<br>Location Quotient: ' + fmt(r.location_quotient, 2)),
       mode: 'markers',
       type: 'scatter',
-      name: 'RCA (Current Strength)',
+      name: 'Comparative Advantage (Current Strength)',
       marker: { color: CB_PAIRED[1], size: 7, opacity: 0.7 },
       hoverinfo: 'text'
     };
     const traceNoRCA = {
       x: rcaNo.map(r => r.industry_feasibility),
       y: rcaNo.map(r => r.industry_complexity),
-      text: rcaNo.map(r => r.industry_description + '<br>NAICS: ' + r.industry_code + '<br>Feasibility: ' + fmt(r.industry_feasibility, 4)),
+      text: rcaNo.map(r => r.industry_description + '<br>Industry Code: ' + r.industry_code + '<br>Feasibility: ' + fmt(r.industry_feasibility, 4)),
       mode: 'markers',
       type: 'scatter',
-      name: 'No RCA',
+      name: 'No Comparative Advantage',
       marker: { color: CB_PAIRED[0], size: 6, opacity: 0.5 },
       hoverinfo: 'text'
     };
@@ -993,12 +1031,12 @@ async function loadRegional(level, geoid) {
     chartDiv.appendChild(buildExportBar(plotEl, 'industry_feasibility_complexity', () => ({
       rows: enriched.filter(r => r.industry_complexity != null),
       columns: [
-        { key: 'industry_code', label: 'NAICS Code' },
+        { key: 'industry_code', label: 'Industry Code' },
         { key: 'industry_description', label: 'Industry' },
         { key: 'industry_feasibility', label: 'Feasibility' },
-        { key: 'industry_complexity', label: 'Complexity' },
+        { key: 'industry_complexity', label: 'Industry Complexity' },
         { key: 'location_quotient', label: 'Location Quotient' },
-        { key: 'industry_comparative_advantage', label: 'RCA' }
+        { key: 'industry_comparative_advantage', label: 'Comparative Advantage' }
       ]
     })));
 
@@ -1021,6 +1059,7 @@ async function initNational() {
   await ensureMeta();
   await ensureIndustryMeta();
   populateNatIndustryList();
+  updateNatStateFilter();
 }
 
 function populateNatIndustryList() {
@@ -1035,6 +1074,24 @@ function populateNatIndustryList() {
   );
 }
 
+function updateNatStateFilter() {
+  const level = document.getElementById('nat-level').value;
+  const wrap = document.getElementById('nat-state-filter-wrap');
+  wrap.style.display = level === 'county' ? '' : 'none';
+  if (level === 'county' && stateList) {
+    const sel = document.getElementById('nat-state-filter');
+    sel.innerHTML = '<option value="">All States</option>';
+    stateList.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s.fips;
+      opt.textContent = s.name;
+      sel.appendChild(opt);
+    });
+  }
+}
+
+document.getElementById('nat-level').addEventListener('change', updateNatStateFilter);
+
 document.getElementById('nat-mode').addEventListener('change', () => {
   const mode = document.getElementById('nat-mode').value;
   document.getElementById('nat-industry-wrap').style.display = mode === 'industry' ? '' : 'none';
@@ -1047,14 +1104,18 @@ document.getElementById('nat-load').addEventListener('click', loadNational);
 // ── Map rendering helpers ──
 
 const METRIC_DESCRIPTIONS = {
-  economic_complexity_index: 'The Economic Complexity Index (ECI) measures the diversity and sophistication of a region\'s productive capabilities, based on the industries in which it has revealed comparative advantage.',
+  economic_complexity_index: 'The Economic Complexity Index measures the diversity and sophistication of a region\'s productive capabilities, based on the industries in which it has comparative advantage.',
   economic_complexity_percentile_score: 'Percentile ranking of each region\'s Economic Complexity Index relative to all regions at the same geographic level.',
-  industrial_diversity: 'Count of distinct six-digit NAICS industries in which the region has measurable employment.',
+  industrial_diversity: 'Count of distinct six-digit industries in which the region has measurable employment.',
   strategic_index: 'The Strategic Index captures the potential for a region to improve its economic complexity through feasible industry development.',
   strategic_index_percentile: 'Percentile ranking of each region\'s Strategic Index relative to all regions at the same geographic level.',
-  location_quotient: 'Location Quotient (LQ) measures the concentration of industry employment in each region relative to the national average. LQ > 1 indicates specialization.',
+  location_quotient: 'The Location Quotient measures the concentration of industry employment in each region relative to the national average. A value greater than 1 indicates specialization.',
+  industry_comparative_advantage: 'Whether a region has a comparative advantage in this industry, defined as a Location Quotient greater than 1.',
+  industry_feasibility: 'A measure of how feasible it is for each region to develop this industry, based on proximity to related industries already present.',
   industry_feasibility_percentile_score: 'Percentile ranking of how feasible it is for each region to develop this industry, based on proximity to related industries already present.',
+  strategic_gain: 'The potential economic complexity gain from developing this industry in each region.',
   strategic_gain_percentile_score: 'Percentile ranking of the potential economic complexity gain from developing this industry in each region.',
+  strategic_gain_possible: 'Whether there is a feasible path for strategic gain from developing this industry.',
   industry_employment_share: 'Share of total regional employment accounted for by this industry.',
   industry_present: 'Whether the industry has measurable employment in each region.'
 };
@@ -1137,9 +1198,7 @@ async function renderCountyMap(plotEl, dataMap, metricKey, metricLabel, level, p
       if (dataMap.has(fips)) {
         locations.push(fips);
         z.push(dataMap.get(fips));
-        const parent = countyToParent ? countyToParent.get(fips) : null;
-        const countyName = parent ? parent.county_name : fips;
-        hoverText.push(countyName + '<br>' + metricLabel + ': ' + fmt(dataMap.get(fips)));
+        hoverText.push(getCountyDisplayName(fips) + '<br>' + metricLabel + ': ' + fmt(dataMap.get(fips)));
       }
     });
   } else {
@@ -1172,14 +1231,15 @@ async function renderCountyMap(plotEl, dataMap, metricKey, metricLabel, level, p
     hoverinfo: 'text',
     colorscale: getColorScale(metricKey),
     colorbar: { title: { text: metricLabel, font: { size: 12 } }, thickness: 15, len: 0.6 },
-    marker: { line: { color: 'rgba(255,255,255,0.3)', width: 0.3 } }
+    marker: { line: { color: 'rgba(255,255,255,0.2)', width: 0.2 } }
   }], {
     geo: {
       scope: 'usa',
       showlakes: false,
       bgcolor: 'rgba(0,0,0,0)',
       lakecolor: 'rgba(0,0,0,0)',
-      subunitcolor: 'rgba(0,0,0,0.15)',
+      subunitcolor: 'rgba(0,0,0,0.5)',
+      subunitwidth: 1.5,
       showsubunits: true
     },
     images: rmiLogoImages(),
@@ -1203,7 +1263,24 @@ async function loadNational() {
     if (mode === 'geography') {
       const metricKey = document.getElementById('nat-geo-metric').value;
       const metricLabel = document.getElementById('nat-geo-metric').selectedOptions[0].text;
-      const geos = getGeosByLevel(level);
+      const stateFilter = level === 'county' ? document.getElementById('nat-state-filter').value : '';
+      let geos = getGeosByLevel(level);
+
+      // Apply state filter for county level
+      if (level === 'county' && stateFilter) {
+        geos = geos.filter(g => {
+          const fips = String(g.geoid).padStart(5, '0');
+          return fips.startsWith(stateFilter);
+        });
+      }
+
+      // Add state name to county display names
+      if (level === 'county') {
+        geos = geos.map(g => {
+          const fips = String(g.geoid).padStart(5, '0');
+          return { ...g, name: getCountyDisplayName(fips) };
+        });
+      }
 
       // ── Choropleth Map ──
       const mapPlotEl = buildMapContainer(container, 'nat-geo-map', metricLabel, metricKey, level, () => ({
@@ -1291,20 +1368,30 @@ async function loadNational() {
       const indCode = natIndWidget ? natIndWidget.getValue() : null;
       if (!indCode) { container.innerHTML = '<div class="empty-state"><p>Please select an industry first.</p></div>'; hideSpinner(); return; }
 
-      const data = await fetchCSVGz('by_industry/' + level + '/' + indCode + '.csv.gz');
+      let data = await fetchCSVGz('by_industry/' + level + '/' + indCode + '.csv.gz');
       const metricKey = document.getElementById('nat-metric').value;
       const metricLabel = document.getElementById('nat-metric').selectedOptions[0].text;
       const indDesc = industryTitles.get(indCode) || indCode;
+      const stateFilter = level === 'county' ? document.getElementById('nat-state-filter').value : '';
+
+      // Apply state filter for county level
+      if (level === 'county' && stateFilter) {
+        data = data.filter(r => String(r.geoid).padStart(5, '0').startsWith(stateFilter));
+      }
 
       // Join geography names
       const levelCode = LEVEL_MAP[level];
       const geoMap = new Map();
       metaGeo.filter(g => g.geo_aggregation_level === levelCode).forEach(g => geoMap.set(String(g.geoid), g.name));
 
-      const rows = data.map(r => ({
-        ...r,
-        geo_name: geoMap.get(String(r.geoid)) || String(r.geoid)
-      }));
+      const rows = data.map(r => {
+        const geoid = String(r.geoid);
+        let geoName = geoMap.get(geoid) || geoid;
+        if (level === 'county') {
+          geoName = getCountyDisplayName(geoid.padStart(5, '0'));
+        }
+        return { ...r, geo_name: geoName };
+      });
 
       const titleEl = document.createElement('h2');
       titleEl.style.cssText = 'color:var(--blue-spruce);margin-bottom:16px;';
@@ -1319,7 +1406,7 @@ async function loadNational() {
             { key: 'geo_name', label: 'Geography' },
             { key: 'geoid', label: 'GeoID' },
             { key: 'industry_present', label: 'Present' },
-            { key: 'industry_comparative_advantage', label: 'RCA' },
+            { key: 'industry_comparative_advantage', label: 'Comparative Advantage' },
             { key: metricKey, label: metricLabel }
           ]
         }));
@@ -1355,7 +1442,7 @@ async function loadNational() {
         '<div class="card"><div class="card-label">Geographies</div><div class="card-value">' + fmtInt(rows.length) + '</div></div>' +
         '<div class="card"><div class="card-label">Present In</div><div class="card-value">' + fmtInt(present) + '</div><div class="card-sub">' + (rows.length ? ((present / rows.length) * 100).toFixed(1) : 0) + '% of geographies</div></div>' +
         '<div class="card"><div class="card-label">Comparative Advantage</div><div class="card-value">' + fmtInt(rca) + '</div><div class="card-sub">' + (rows.length ? ((rca / rows.length) * 100).toFixed(1) : 0) + '% of geographies</div></div>' +
-        '<div class="card"><div class="card-label">Avg ' + metricLabel + '</div><div class="card-value">' + fmt(avg) + '</div></div>';
+        '<div class="card"><div class="card-label">Average ' + metricLabel + '</div><div class="card-value">' + fmt(avg) + '</div></div>';
       container.appendChild(cardsDiv);
 
       // Table
@@ -1366,8 +1453,8 @@ async function loadNational() {
         { key: 'geo_name', label: 'Geography' },
         { key: 'geoid', label: 'GeoID', align: 'center' },
         { key: 'industry_present', label: 'Present', align: 'center', fmt: v => v === 1 ? '\u2713' : '' },
-        { key: 'industry_comparative_advantage', label: 'RCA', align: 'center', fmt: v => v === 1 ? '\u2713' : '' },
-        { key: metricKey, label: metricLabel, align: 'right', fmt: v => metricKey === 'industry_present' ? (v === 1 ? 'Yes' : 'No') : fmt(v, 3) }
+        { key: 'industry_comparative_advantage', label: 'Comparative Advantage', align: 'center', fmt: v => v === 1 ? '\u2713' : '' },
+        { key: metricKey, label: metricLabel, align: 'right', fmt: v => metricKey === 'industry_present' || metricKey === 'industry_comparative_advantage' || metricKey === 'strategic_gain_possible' ? (v === 1 ? 'Yes' : 'No') : fmt(v, 3) }
       ], rows, metricKey, 'desc');
       container.appendChild(tw);
 
@@ -1398,7 +1485,7 @@ async function loadNational() {
           { key: 'geo_name', label: 'Geography' },
           { key: 'geoid', label: 'GeoID' },
           { key: 'industry_present', label: 'Present' },
-          { key: 'industry_comparative_advantage', label: 'RCA' },
+          { key: 'industry_comparative_advantage', label: 'Comparative Advantage' },
           { key: metricKey, label: metricLabel }
         ]
       })));
@@ -1426,7 +1513,14 @@ async function initIndustrySpace() {
 function populateISGeoList() {
   const level = document.getElementById('is-level').value;
   const geos = getGeosByLevel(level);
-  const items = geos.map(g => ({ value: String(g.geoid), label: g.name })).sort((a, b) => a.label.localeCompare(b.label));
+  const items = geos.map(g => {
+    let label = g.name;
+    if (level === 'county') {
+      const fips = String(g.geoid).padStart(5, '0');
+      label = getCountyDisplayName(fips);
+    }
+    return { value: String(g.geoid), label: label };
+  }).sort((a, b) => a.label.localeCompare(b.label));
   isGeoWidget = createSearchSelect(
     document.getElementById('is-geo-search'), items,
     'Highlight a ' + LEVEL_LABEL[level] + '...',
@@ -1442,6 +1536,43 @@ document.getElementById('is-threshold').addEventListener('input', function () {
 
 document.getElementById('is-load').addEventListener('click', loadIndustrySpace);
 
+// Cache for force-directed layout positions
+const layoutCache = new Map();
+
+function runForceLayout(nodes, edges, levelCode) {
+  const cacheKey = levelCode + '_' + edges.length;
+  if (layoutCache.has(cacheKey)) return layoutCache.get(cacheKey);
+
+  const nodeMap = new Map();
+  const simNodes = nodes.map((n, i) => {
+    const sn = { id: String(n.industry_code), index: i, x: Math.random() * 800 - 400, y: Math.random() * 800 - 400 };
+    nodeMap.set(sn.id, sn);
+    return sn;
+  });
+
+  const simLinks = edges.map(e => ({
+    source: nodeMap.get(String(e.from)),
+    target: nodeMap.get(String(e.to)),
+    weight: e.weight
+  })).filter(l => l.source && l.target);
+
+  // Run d3-force simulation synchronously
+  const sim = d3.forceSimulation(simNodes)
+    .force('link', d3.forceLink(simLinks).id(d => d.id).distance(d => 80 * (1 - d.weight)).strength(d => d.weight * 0.5))
+    .force('charge', d3.forceManyBody().strength(-30).distanceMax(300))
+    .force('center', d3.forceCenter(0, 0))
+    .force('collide', d3.forceCollide(5))
+    .stop();
+
+  // Run 200 iterations
+  for (let i = 0; i < 200; i++) sim.tick();
+
+  const positions = new Map();
+  simNodes.forEach(sn => positions.set(sn.id, { x: sn.x, y: sn.y }));
+  layoutCache.set(cacheKey, positions);
+  return positions;
+}
+
 async function loadIndustrySpace() {
   showSpinner();
   try {
@@ -1455,10 +1586,18 @@ async function loadIndustrySpace() {
     const nodes = nodesAll.filter(r => r.geo_aggregation_level === levelCode);
     const edges = edgesAll.filter(r => r.geo_aggregation_level === levelCode);
 
-    // Threshold edges
+    // Threshold edges for display
     const sortedWeights = edges.map(e => e.weight).sort((a, b) => b - a);
     const cutoff = sortedWeights[Math.floor(sortedWeights.length * threshPct / 100)] || 0;
     const filteredEdges = edges.filter(e => e.weight >= cutoff);
+
+    // Use top 20% edges for layout (denser than display threshold for better structure)
+    const layoutPct = Math.max(threshPct, 20);
+    const layoutCutoff = sortedWeights[Math.floor(sortedWeights.length * layoutPct / 100)] || 0;
+    const layoutEdges = edges.filter(e => e.weight >= layoutCutoff);
+
+    // Compute force-directed layout
+    const positions = runForceLayout(nodes, layoutEdges, levelCode);
 
     // Optional geo highlight
     let rcaSet = null;
@@ -1479,15 +1618,15 @@ async function loadIndustrySpace() {
     const nodeMap = new Map();
     nodes.forEach(n => nodeMap.set(String(n.industry_code), n));
 
-    // Edge traces
+    // Edge traces using force layout positions
     const edgeX = [];
     const edgeY = [];
     filteredEdges.forEach(e => {
-      const from = nodeMap.get(String(e.from));
-      const to = nodeMap.get(String(e.to));
-      if (from && to) {
-        edgeX.push(from.industry_centrality, to.industry_centrality, null);
-        edgeY.push(from.industry_complexity, to.industry_complexity, null);
+      const fromPos = positions.get(String(e.from));
+      const toPos = positions.get(String(e.to));
+      if (fromPos && toPos) {
+        edgeX.push(fromPos.x, toPos.x, null);
+        edgeY.push(fromPos.y, toPos.y, null);
       }
     });
 
@@ -1495,15 +1634,15 @@ async function loadIndustrySpace() {
       x: edgeX, y: edgeY,
       mode: 'lines',
       type: 'scatter',
-      line: { color: 'rgba(200,200,200,0.3)', width: 0.5 },
+      line: { color: 'rgba(180,180,180,0.25)', width: 0.4 },
       hoverinfo: 'none',
       showlegend: false
     };
 
-    // Node traces
+    // Node traces using force layout positions
     const complexities = nodes.map(n => n.industry_complexity);
     const ubiquities = nodes.map(n => n.industry_ubiquity);
-    const sizes = ubiquities.map(u => Math.max(4, Math.log(u + 1) * 3));
+    const sizes = ubiquities.map(u => Math.max(5, Math.log(u + 1) * 3.5));
 
     let nodeColors, nodeColorbar;
     if (rcaSet) {
@@ -1511,13 +1650,13 @@ async function loadIndustrySpace() {
       nodeColorbar = undefined;
     } else {
       nodeColors = complexities;
-      nodeColorbar = { title: 'Complexity', thickness: 15 };
+      nodeColorbar = { title: { text: 'Industry Complexity', font: { size: 11 } }, thickness: 15 };
     }
 
     const nodeTrace = {
-      x: nodes.map(n => n.industry_centrality),
-      y: nodes.map(n => n.industry_complexity),
-      text: nodes.map(n => n.industry_description + '<br>Code: ' + n.industry_code + '<br>Complexity: ' + fmt(n.industry_complexity) + '<br>Ubiquity: ' + n.industry_ubiquity + '<br>Centrality: ' + fmt(n.industry_centrality, 5) + (rcaSet ? '<br>RCA: ' + (rcaSet.has(String(n.industry_code)) ? 'Yes' : 'No') : '')),
+      x: nodes.map(n => { const p = positions.get(String(n.industry_code)); return p ? p.x : 0; }),
+      y: nodes.map(n => { const p = positions.get(String(n.industry_code)); return p ? p.y : 0; }),
+      text: nodes.map(n => n.industry_description + '<br>Industry Code: ' + n.industry_code + '<br>Industry Complexity: ' + fmt(n.industry_complexity) + '<br>Ubiquity: ' + n.industry_ubiquity + '<br>Centrality: ' + fmt(n.industry_centrality, 5) + (rcaSet ? '<br>Comparative Advantage: ' + (rcaSet.has(String(n.industry_code)) ? 'Yes' : 'No') : '')),
       mode: 'markers',
       type: 'scatter',
       marker: {
@@ -1525,8 +1664,8 @@ async function loadIndustrySpace() {
         color: nodeColors,
         colorscale: rcaSet ? undefined : 'Viridis',
         colorbar: nodeColorbar,
-        line: { color: 'rgba(0,0,0,0.2)', width: 0.5 },
-        opacity: rcaSet ? nodes.map(n => rcaSet.has(String(n.industry_code)) ? 1 : 0.3) : 0.8
+        line: { color: 'rgba(0,0,0,0.15)', width: 0.5 },
+        opacity: rcaSet ? nodes.map(n => rcaSet.has(String(n.industry_code)) ? 1 : 0.25) : 0.85
       },
       hoverinfo: 'text',
       showlegend: false
@@ -1538,12 +1677,12 @@ async function loadIndustrySpace() {
       traces.push({
         x: [null], y: [null], mode: 'markers', type: 'scatter',
         marker: { size: 10, color: CB_PAIRED[1] },
-        name: 'RCA (Strength)', showlegend: true
+        name: 'Comparative Advantage (Strength)', showlegend: true
       });
       traces.push({
         x: [null], y: [null], mode: 'markers', type: 'scatter',
         marker: { size: 10, color: '#cccccc' },
-        name: 'No RCA', showlegend: true
+        name: 'No Comparative Advantage', showlegend: true
       });
     }
 
@@ -1556,15 +1695,16 @@ async function loadIndustrySpace() {
     chartDiv.appendChild(plotEl); container.appendChild(chartDiv);
 
     Plotly.newPlot(plotEl, traces, {
-      xaxis: { title: 'Industry Centrality', zeroline: false },
-      yaxis: { title: 'Industry Complexity', zeroline: false },
+      xaxis: { showgrid: false, zeroline: false, showticklabels: false, title: '' },
+      yaxis: { showgrid: false, zeroline: false, showticklabels: false, title: '' },
       images: rmiLogoImages(),
-      margin: { t: 30, r: 20, b: 50, l: 60 },
-      height: 600,
+      margin: { t: 20, r: 20, b: 20, l: 20 },
+      height: 650,
       hovermode: 'closest',
       legend: { x: 0.01, y: 0.99, bgcolor: 'rgba(255,255,255,0.8)' },
-      font: { family: 'Source Sans Pro, Roboto, sans-serif' }
-    }, { responsive: true });
+      font: { family: 'Source Sans Pro, Roboto, sans-serif' },
+      dragmode: 'pan'
+    }, { responsive: true, scrollZoom: true });
 
     chartDiv.appendChild(buildExportBar(plotEl, 'industry_space_network', () => ({
       rows: nodes.map(n => ({
@@ -1573,19 +1713,19 @@ async function loadIndustrySpace() {
         complexity: n.industry_complexity,
         centrality: n.industry_centrality,
         ubiquity: n.industry_ubiquity,
-        rca: rcaSet ? (rcaSet.has(String(n.industry_code)) ? 1 : 0) : ''
+        comparative_advantage: rcaSet ? (rcaSet.has(String(n.industry_code)) ? 1 : 0) : ''
       })),
       columns: [
-        { key: 'industry_code', label: 'NAICS Code' },
+        { key: 'industry_code', label: 'Industry Code' },
         { key: 'industry_description', label: 'Industry' },
-        { key: 'complexity', label: 'Complexity' },
+        { key: 'complexity', label: 'Industry Complexity' },
         { key: 'centrality', label: 'Centrality' },
         { key: 'ubiquity', label: 'Ubiquity' },
-        { key: 'rca', label: 'RCA' }
+        { key: 'comparative_advantage', label: 'Comparative Advantage' }
       ]
     })));
 
-    // ICI Distribution
+    // Industry Complexity Distribution
     const chtitle2 = document.createElement('div'); chtitle2.className = 'section-title';
     chtitle2.textContent = 'Industry Complexity Distribution';
     container.appendChild(chtitle2);
@@ -1600,7 +1740,7 @@ async function loadIndustrySpace() {
       marker: { color: CB_PAIRED[1], line: { color: CB_PAIRED[0], width: 1 } },
       nbinsx: 40
     }], {
-      xaxis: { title: 'Industry Complexity Index' },
+      xaxis: { title: 'Industry Complexity' },
       yaxis: { title: 'Count' },
       images: rmiLogoImages(),
       margin: { t: 20, r: 20, b: 50, l: 50 },
@@ -1610,7 +1750,7 @@ async function loadIndustrySpace() {
 
     chartDiv2.appendChild(buildExportBar(plotEl2, 'industry_complexity_distribution', null));
 
-    // Edge stats
+    // Stats cards
     const statDiv = document.createElement('div');
     statDiv.className = 'cards';
     statDiv.innerHTML =
