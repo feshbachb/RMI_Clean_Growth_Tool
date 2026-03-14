@@ -1,4 +1,4 @@
-# Deploy Clean Growth Tool dashboard to GitHub Pages
+# Deploy Clean Growth Tool dashboard + R Shiny app to GitHub Pages
 name: Deploy to GitHub Pages
 
 on:
@@ -21,8 +21,23 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup R
+        uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: 'release'
+
+      - name: Install shinylive
+        run: |
+          Rscript -e 'install.packages("shinylive", repos = "https://cloud.r-project.org")'
+
+      - name: Export Shiny app to docs/shiny/
+        run: |
+          Rscript -e 'shinylive::export("shiny_app", "docs/shiny")'
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
+
       - name: Upload docs folder as artifact
         uses: actions/upload-pages-artifact@v3
         with:
