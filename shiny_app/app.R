@@ -57,7 +57,15 @@ fetch_csv_gz <- function(rel_path) {
 }
 
 # URL to county GeoJSON (plotly.js fetches this directly in the browser)
+# Note: plotly choropleth requires GeoJSON (not TopoJSON), so we use the full file here.
+# The main HTML dashboard uses the smaller TopoJSON + topojson-client for D3 rendering.
 COUNTY_GEOJSON_URL <- paste0(BASE_URL, "us-counties-2023.json")
+
+# Filter territories: only keep continental US + DC (state FIPS <= 56)
+filter_continental <- function(df, geoid_col = "geoid") {
+  state_fips <- as.integer(substr(as.character(df[[geoid_col]]), 1, 2))
+  df[!is.na(state_fips) & state_fips <= 56, ]
+}
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 pad_geoid <- function(geoid, level) {
@@ -513,8 +521,13 @@ server <- function(input, output, session) {
     level      <- nd$level
     metric_key <- nd$metric_key
     data       <- nd$data
-    vals       <- data[[metric_key]]
 
+    # Filter territories (keep continental US + DC only)
+    if (level %in% c("county", "state")) {
+      data <- filter_continental(data)
+    }
+
+    vals       <- data[[metric_key]]
     is_binary <- metric_key %in% BINARY_METRICS
 
     if (level == "state") {
@@ -533,21 +546,26 @@ server <- function(input, output, session) {
             locations = data$state_abbreviation, z = vals,
             colorscale = BINARY_SCALE, zmin = 0, zmax = 1,
             text = data$display_name,
-            hovertemplate = "%{text}<br>%{z}<extra></extra>"
+            hovertemplate = "<b>%{text}</b><br>%{z}<extra></extra>"
           )
       } else {
         z_qt <- quantile_transform(vals)
+        # Compute percentile rank for hover
+        pct_rank <- rank(vals, ties.method = "average", na.last = "keep")
+        pct_rank <- round(100 * pct_rank / sum(!is.na(vals)))
         p <- plot_ly() %>%
           add_trace(
             type = "choropleth", locationmode = "USA-states",
             locations = data$state_abbreviation,
             z = z_qt,
-            customdata = vals,
+            customdata = matrix(c(vals, pct_rank), ncol = 2),
             colorscale = YLGNBU_SCALE,
             text = data$display_name,
             hovertemplate = paste0(
-              "%{text}<br>", nd$metric_label,
-              ": %{customdata:.3f}<extra></extra>"
+              "<b>%{text}</b><br>",
+              nd$metric_label, ": %{customdata[0]:.3f}<br>",
+              "Percentile: %{customdata[1]:.0f}%",
+              "<extra></extra>"
             ),
             colorbar = list(
               title = nd$metric_label,
@@ -579,12 +597,14 @@ server <- function(input, output, session) {
             z = plot_data[[metric_key]],
             colorscale = BINARY_SCALE, zmin = 0, zmax = 1,
             text = plot_data$display_name,
-            hovertemplate = "%{text}<br>%{z}<extra></extra>",
-            marker = list(line = list(width = 0.3, color = "#999"))
+            hovertemplate = "<b>%{text}</b><br>%{z}<extra></extra>",
+            marker = list(line = list(width = 0.3, color = "#ffffff"))
           )
       } else {
         z_qt <- quantile_transform(plot_data[[metric_key]])
         raw_vals <- plot_data[[metric_key]]
+        pct_rank <- rank(raw_vals, ties.method = "average", na.last = "keep")
+        pct_rank <- round(100 * pct_rank / sum(!is.na(raw_vals)))
         p <- plot_ly() %>%
           add_trace(
             type = "choropleth",
@@ -592,14 +612,16 @@ server <- function(input, output, session) {
             featureidkey = "id",
             locations = plot_data$geoid,
             z = z_qt,
-            customdata = raw_vals,
+            customdata = matrix(c(raw_vals, pct_rank), ncol = 2),
             colorscale = YLGNBU_SCALE,
             text = plot_data$display_name,
             hovertemplate = paste0(
-              "%{text}<br>", nd$metric_label,
-              ": %{customdata:.4f}<extra></extra>"
+              "<b>%{text}</b><br>",
+              nd$metric_label, ": %{customdata[0]:.4f}<br>",
+              "Percentile: %{customdata[1]:.0f}%",
+              "<extra></extra>"
             ),
-            marker = list(line = list(width = 0.3, color = "#999")),
+            marker = list(line = list(width = 0.3, color = "#ffffff")),
             colorbar = list(
               title = nd$metric_label,
               tickvals = seq(0, 1, length.out = 5),

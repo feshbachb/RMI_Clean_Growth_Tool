@@ -204,17 +204,20 @@ body {
 .map-tooltip {
   position: absolute;
   pointer-events: none;
-  background: rgba(255,255,255,.95);
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  padding: 6px 10px;
+  background: rgba(255,255,255,.97);
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  padding: 10px 14px;
   font-size: 13px;
-  line-height: 1.4;
-  box-shadow: 0 2px 6px rgba(0,0,0,.15);
+  line-height: 1.5;
+  box-shadow: 0 4px 16px rgba(0,0,0,.12), 0 1px 3px rgba(0,0,0,.08);
   z-index: 1000;
   display: none;
-  max-width: 260px;
+  max-width: 280px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
+.map-tooltip b { color: var(--blue-spruce); }
 .spinner-overlay {
   display: none;
   position: fixed;
@@ -359,6 +362,9 @@ body {
 .map-controls button:hover { background: #e8f8f8; border-color: var(--energy); color: var(--blue-spruce); }
 .map-controls button.active { background: var(--energy); color: var(--blue-spruce); border-color: var(--energy-dark); }
 .map-controls .zoom-hint { font-size: 11px; color: #999; align-self: center; margin-left: 4px; }
+
+/* ── County path transitions ── */
+.county-path { transition: fill-opacity 0.2s ease; }
 
 /* ── Footer ── */
 .site-footer {
@@ -542,9 +548,11 @@ let crosswalk = null;
 
 // Map infrastructure
 let countyGeoJSON = null;        // GeoJSON FeatureCollection for US counties
+let countyTopoJSON = null;       // TopoJSON topology (smaller, used for state mesh extraction)
 let stateFipsToAbbr = null;      // Map: "01" -> "AL"
 let countyToParent = null;       // Map: countyGeoid -> { cbsa: {geoid,name}, csa: {geoid,name}, cz: {geoid,name} }
-const COUNTY_GEOJSON_URL = 'us-counties-2023.json';
+const COUNTY_TOPO_URL = 'us-counties-2023-topo.json';
+const COUNTY_GEOJSON_URL = 'us-counties-2023.json'; // legacy fallback
 
 const CB_PAIRED = ['#a6cee3','#1f78b4','#b2df8a','#33a02c','#fb9a99','#e31a1c','#fdbf6f','#ff7f00','#cab2d6'];
 
@@ -681,11 +689,29 @@ function fmtInt(v) { return v == null || isNaN(v) ? '—' : Math.round(v).toLoca
 async function fetchGeoJSON() {
   if (countyGeoJSON) return countyGeoJSON;
   performance.mark('geojson-start');
+  // Prefer TopoJSON (1.4MB) over GeoJSON (3.3MB) — ~60% smaller
+  try {
+    const resp = await fetch(BASE + COUNTY_TOPO_URL);
+    if (resp.ok) {
+      countyTopoJSON = await resp.json();
+      const raw = topojson.feature(countyTopoJSON, countyTopoJSON.objects.counties);
+      // Filter to continental US + DC (FIPS ≤ 56)
+      raw.features = raw.features.filter(f => {
+        const fips = parseInt(String(f.id).substring(0, 2), 10);
+        return fips <= 56;
+      });
+      countyGeoJSON = raw;
+      performance.mark('geojson-end');
+      performance.measure('TopoJSON load + convert', 'geojson-start', 'geojson-end');
+      return countyGeoJSON;
+    }
+  } catch (e) { console.warn('TopoJSON load failed, falling back to GeoJSON:', e); }
+  // Fallback to legacy GeoJSON
   const resp = await fetch(BASE + COUNTY_GEOJSON_URL);
   if (!resp.ok) throw new Error('Failed to fetch county GeoJSON');
   countyGeoJSON = await resp.json();
   performance.mark('geojson-end');
-  performance.measure('GeoJSON load', 'geojson-start', 'geojson-end');
+  performance.measure('GeoJSON load (fallback)', 'geojson-start', 'geojson-end');
   return countyGeoJSON;
 }
 
@@ -1317,19 +1343,25 @@ async function renderStateMap(plotEl, geos, metricKey, metricLabel) {
     .on('mouseenter', function(event, d) {
       const tip = stateTipByTopoId.get(d.id);
       if (!tip) return;
-      d3.select(this).attr('stroke', '#45CFCC').attr('stroke-width', 2.5).style('fill-opacity', 0.95).raise();
+      d3.select(this).attr('stroke', '#45CFCC').attr('stroke-width', 2.5).style('fill-opacity', 0.92).raise();
+      // Re-draw state mesh on top after raising
+      svg.select('.state-mesh-overlay').raise();
       tooltip.style.display = 'block';
-      tooltip.textContent = '';
+      tooltip.innerHTML = '';
       const val = stateValByTopoId.get(d.id);
-      let pctRank = '';
+      const lines = tip.split('\n');
+      const nameEl = document.createElement('b');
+      nameEl.textContent = lines[0];
+      tooltip.appendChild(nameEl);
+      for (let i = 1; i < lines.length; i++) {
+        tooltip.appendChild(document.createElement('br'));
+        tooltip.appendChild(document.createTextNode(lines[i]));
+      }
       if (val != null) {
         const rank = allVals.filter(v => v <= val).length;
-        pctRank = '\nPercentile: ' + Math.round(100 * rank / allVals.length) + '%';
+        tooltip.appendChild(document.createElement('br'));
+        tooltip.appendChild(document.createTextNode('Percentile: ' + Math.round(100 * rank / allVals.length) + '%'));
       }
-      (tip + pctRank).split('\n').forEach((line, i) => {
-        if (i > 0) tooltip.appendChild(document.createElement('br'));
-        tooltip.appendChild(document.createTextNode(line));
-      });
     })
     .on('mousemove', function(event) {
       const rect = plotEl.getBoundingClientRect();
@@ -1347,9 +1379,10 @@ async function renderStateMap(plotEl, geos, metricKey, metricLabel) {
       }
     });
 
-  // State boundary lines
+  // State boundary lines (mesh overlay — stays on top during hover)
   const stateMesh = topojson.mesh(statesTopo, statesTopo.objects.states, (a, b) => a !== b);
   svg.append('path')
+    .attr('class', 'state-mesh-overlay')
     .datum(stateMesh)
     .attr('d', path)
     .attr('fill', 'none')
@@ -1630,9 +1663,8 @@ async function renderCountyMap(plotEl, dataMap, metricKey, metricLabel, level, p
     .on('zoom', (event) => {
       mapG.attr('transform', event.transform);
       // Scale strokes inversely so they stay crisp
-      mapG.selectAll('.county-path').attr('stroke-width', 0.4 / event.transform.k);
-      mapG.selectAll('.state-boundary').attr('stroke-width', 1.2 / event.transform.k);
-      mapG.selectAll('.nation-boundary').attr('stroke-width', 1.5 / event.transform.k);
+      mapG.selectAll('.county-path').attr('stroke-width', 0.5 / event.transform.k);
+      mapG.selectAll('.state-boundary').attr('stroke-width', 1.5 / event.transform.k);
       mapG.selectAll('.region-boundary').attr('stroke-width', 2 / event.transform.k);
     })
     .on('start', () => svg.style('cursor', 'grabbing'))
@@ -1653,34 +1685,45 @@ async function renderCountyMap(plotEl, dataMap, metricKey, metricLabel, level, p
       const val = valMap.get(d.id);
       return val != null ? color(val) : '#e8e8e8';
     })
-    .attr('stroke', '#999')
-    .attr('stroke-width', 0.4)
+    .attr('stroke', '#ffffff')
+    .attr('stroke-width', 0.5)
     .style('cursor', d => valMap.has(d.id) ? 'pointer' : 'default')
     .on('mouseenter', function(event, d) {
       const tip = tipMap.get(d.id);
       if (!tip) return;
-      d3.select(this).attr('stroke', '#45CFCC').attr('stroke-width', 2).style('fill-opacity', 0.95).raise();
+      d3.select(this).attr('stroke', '#0f172a').attr('stroke-width', 1.5).style('fill-opacity', 0.92);
+      // Move hovered county to front, then re-raise boundaries
+      this.parentNode.appendChild(this);
+      // Re-draw state boundaries on top after raising county
+      mapG.selectAll('.state-boundary').raise();
       tooltip.style.display = 'block';
-      tooltip.textContent = '';
-      // Add percentile rank
+      tooltip.innerHTML = '';
       const val = valMap.get(d.id);
-      let pctRank = '';
+      const lines = tip.split('\n');
+      // First line = geography name (bold)
+      const nameEl = document.createElement('b');
+      nameEl.textContent = lines[0];
+      tooltip.appendChild(nameEl);
+      // Remaining lines = metric values
+      for (let i = 1; i < lines.length; i++) {
+        tooltip.appendChild(document.createElement('br'));
+        tooltip.appendChild(document.createTextNode(lines[i]));
+      }
+      // Percentile rank
       if (val != null) {
         const rank = allVals.filter(v => v <= val).length;
-        pctRank = '\nPercentile: ' + Math.round(100 * rank / allVals.length) + '%';
+        tooltip.appendChild(document.createElement('br'));
+        const pctEl = document.createTextNode('Percentile: ' + Math.round(100 * rank / allVals.length) + '%');
+        tooltip.appendChild(pctEl);
       }
-      (tip + pctRank).split('\n').forEach((line, i) => {
-        if (i > 0) tooltip.appendChild(document.createElement('br'));
-        tooltip.appendChild(document.createTextNode(line));
-      });
     })
     .on('mousemove', function(event) {
       const rect = plotEl.getBoundingClientRect();
-      tooltip.style.left = (event.clientX - rect.left + 12) + 'px';
-      tooltip.style.top = (event.clientY - rect.top - 10) + 'px';
+      tooltip.style.left = (event.clientX - rect.left + 14) + 'px';
+      tooltip.style.top = (event.clientY - rect.top - 12) + 'px';
     })
     .on('mouseleave', function() {
-      d3.select(this).attr('stroke', '#999').attr('stroke-width', 0.4).style('fill-opacity', 1);
+      d3.select(this).attr('stroke', '#ffffff').attr('stroke-width', 0.5).style('fill-opacity', 1);
       tooltip.style.display = 'none';
     })
     .on('click', function(event, d) {
@@ -1696,28 +1739,36 @@ async function renderCountyMap(plotEl, dataMap, metricKey, metricLabel, level, p
       navigateToRegional(navLevel, navGeoid);
     });
 
-  // Draw state boundaries on top
+  // Draw state boundaries on top — extracted from counties topology when available
   try {
-    const statesTopo = await fetchStatesTopo();
-    const stateMesh = topojson.mesh(statesTopo, statesTopo.objects.states, (a, b) => a !== b);
-    mapG.append('path')
-      .attr('class', 'state-boundary')
-      .datum(stateMesh)
-      .attr('d', path)
-      .attr('fill', 'none')
-      .attr('stroke', '#333')
-      .attr('stroke-width', 1.2)
-      .attr('stroke-linejoin', 'round')
-      .style('pointer-events', 'none');
-    const nationMesh = topojson.mesh(statesTopo, statesTopo.objects.states, (a, b) => a === b);
-    mapG.append('path')
-      .attr('class', 'nation-boundary')
-      .datum(nationMesh)
-      .attr('d', path)
-      .attr('fill', 'none')
-      .attr('stroke', '#222')
-      .attr('stroke-width', 1.5)
-      .style('pointer-events', 'none');
+    if (countyTopoJSON) {
+      // Extract state boundaries from county topology (same file, no extra fetch)
+      const stateMesh = topojson.mesh(countyTopoJSON, countyTopoJSON.objects.counties, (a, b) => {
+        return String(a.id).substring(0, 2) !== String(b.id).substring(0, 2);
+      });
+      mapG.append('path')
+        .attr('class', 'state-boundary')
+        .datum(stateMesh)
+        .attr('d', path)
+        .attr('fill', 'none')
+        .attr('stroke', '#fff')
+        .attr('stroke-width', 1.5)
+        .attr('stroke-linejoin', 'round')
+        .style('pointer-events', 'none');
+    } else {
+      // Fallback: use separate states TopoJSON
+      const statesTopo = await fetchStatesTopo();
+      const stateMesh = topojson.mesh(statesTopo, statesTopo.objects.states, (a, b) => a !== b);
+      mapG.append('path')
+        .attr('class', 'state-boundary')
+        .datum(stateMesh)
+        .attr('d', path)
+        .attr('fill', 'none')
+        .attr('stroke', '#fff')
+        .attr('stroke-width', 1.5)
+        .attr('stroke-linejoin', 'round')
+        .style('pointer-events', 'none');
+    }
   } catch(e) { /* state boundaries optional */ }
 
   // Draw CBSA/CSA/CZ region boundary overlays

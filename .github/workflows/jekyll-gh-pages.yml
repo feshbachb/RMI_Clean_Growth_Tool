@@ -27,9 +27,17 @@ jobs:
         with:
           r-version: 'release'
 
-      - name: Install shinylive
+      - name: Install system dependencies
         run: |
-          Rscript -e 'install.packages("shinylive", repos = "https://cloud.r-project.org")'
+          sudo apt-get update
+          sudo apt-get install -y libcurl4-openssl-dev libssl-dev libxml2-dev
+
+      - name: Install R packages
+        run: |
+          Rscript -e '
+            install.packages("pak", repos = "https://cloud.r-project.org")
+            pak::pak(c("shinylive", "bslib", "shiny", "httpuv"))
+          '
 
       - name: Export Shiny app to docs/shiny/
         run: |
