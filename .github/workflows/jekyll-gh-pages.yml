@@ -1,4 +1,4 @@
-# Deploy Clean Growth Tool dashboard + R Shiny app to GitHub Pages
+# Deploy Clean Growth Tool static dashboard to GitHub Pages
 name: Deploy to GitHub Pages
 
 on:
@@ -16,35 +16,14 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Setup R
-        uses: r-lib/actions/setup-r@v2
-        with:
-          r-version: 'release'
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libcurl4-openssl-dev libssl-dev libxml2-dev
-
-      - name: Install R packages
-        run: |
-          Rscript -e '
-            install.packages("pak", repos = "https://cloud.r-project.org")
-            pak::pak(c(
-              "shinylive", "bslib", "shiny", "httpuv",
-              "plotly", "DT", "visNetwork", "dplyr", "jsonlite"
-            ))
-          '
-
-      - name: Export Shiny app to docs/shiny/
-        run: |
-          Rscript -e 'shinylive::export("shiny_app", "docs/shiny")'
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
@@ -54,13 +33,6 @@ jobs:
         with:
           path: ./docs
 
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
