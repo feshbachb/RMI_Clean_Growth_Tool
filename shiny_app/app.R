@@ -39,7 +39,9 @@ fetch_csv <- function(rel_path) {
     download.file(url, tmp, quiet = TRUE)
     read.csv(tmp, stringsAsFactors = FALSE)
   }, error = function(e) {
-    message("Failed to fetch: ", url, " — ", e$message)
+    warning("Failed to fetch: ", url, " \u2014 ", e$message)
+    showNotification(paste("Failed to load:", rel_path), type = "error",
+                     duration = 8)
     data.frame()
   }, finally = unlink(tmp))
 }
@@ -51,7 +53,9 @@ fetch_csv_gz <- function(rel_path) {
     download.file(url, tmp, mode = "wb", quiet = TRUE)
     read.csv(gzfile(tmp), stringsAsFactors = FALSE)
   }, error = function(e) {
-    message("Failed to fetch: ", url, " — ", e$message)
+    warning("Failed to fetch: ", url, " \u2014 ", e$message)
+    showNotification(paste("Failed to load:", rel_path), type = "error",
+                     duration = 8)
     data.frame()
   }, finally = unlink(tmp))
 }
@@ -136,54 +140,174 @@ RMI_ENERGY <- "#45CFCC"
 # ══════════════════════════════════════════════════════════════════════════════
 #  UI
 # ══════════════════════════════════════════════════════════════════════════════
-MOBILE_CSS <- "
-/* ── Mobile responsive overrides ── */
-@media (max-width: 600px) {
-  /* Navbar: compact */
-  .navbar-brand { font-size: 15px !important; }
-  .navbar-brand img { height: 22px !important; }
-  .nav-link { font-size: 13px; padding: 8px 10px !important; }
+APP_CSS <- "
+/* ── Loading overlay (visible until metadata loads) ── */
+#loading-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: #fff; z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column; gap: 16px;
+}
+#loading-overlay.loaded {
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.4s ease;
+}
+#loading-overlay .loading-text {
+  color: #1B3A4B; font-size: 16px; font-weight: 500;
+}
 
-  /* Sidebar: narrower on mobile */
+/* ── Spinner animation ── */
+@keyframes rmi-spin {
+  to { transform: rotate(360deg); }
+}
+.rmi-spinner {
+  width: 44px; height: 44px;
+  border: 4px solid #e0e0e0;
+  border-top-color: #45CFCC;
+  border-radius: 50%;
+  animation: rmi-spin 0.8s linear infinite;
+}
+.rmi-spinner-sm {
+  width: 28px; height: 28px; border-width: 3px;
+}
+
+/* ── Busy indicator (top bar) ── */
+.shiny-busy .busy-bar {
+  display: block !important;
+}
+.busy-bar {
+  display: none;
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 3px; z-index: 2000;
+  background: linear-gradient(90deg, #45CFCC 0%, #1B3A4B 50%, #45CFCC 100%);
+  background-size: 200% 100%;
+  animation: busy-slide 1.5s linear infinite;
+}
+@keyframes busy-slide {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── Loading placeholder for content areas ── */
+.loading-placeholder {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 48px 16px; color: #888; gap: 12px;
+}
+.loading-placeholder .rmi-spinner { margin-bottom: 4px; }
+
+/* ── Button loading state ── */
+.btn-loading { pointer-events: none; opacity: 0.7; }
+.btn-loading::after {
+  content: ''; display: inline-block;
+  width: 14px; height: 14px; margin-left: 8px;
+  border: 2px solid #fff; border-top-color: transparent;
+  border-radius: 50%;
+  animation: rmi-spin 0.7s linear infinite;
+  vertical-align: middle;
+}
+
+/* ── Mobile: iPhone & small screens ── */
+@media (max-width: 767px) {
+  /* Let content scroll naturally — don't squish into viewport */
+  .bslib-page-fill, .bslib-gap-spacing,
+  .tab-content, .tab-pane, .tab-pane > .bslib-sidebar-layout {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+  }
+
+  /* Sidebar: collapsible overlay */
+  .bslib-sidebar-layout {
+    display: flex !important;
+    flex-direction: column !important;
+    height: auto !important;
+  }
   .bslib-sidebar-layout > .sidebar {
+    width: 100% !important;
+    max-width: 100% !important;
+    position: relative !important;
+  }
+  .bslib-sidebar-layout > .main {
     width: 100% !important;
     max-width: 100% !important;
     flex: none !important;
   }
 
-  /* Prevent iOS input zoom (needs >= 16px) */
-  .selectize-input, .form-control, .form-select,
+  /* Navbar: compact & wrap */
+  .navbar { flex-wrap: wrap; }
+  .navbar-brand { font-size: 14px !important; }
+  .navbar-brand img { height: 20px !important; margin-right: 6px !important; }
+  .navbar-nav { flex-wrap: wrap; }
+  .nav-link {
+    font-size: 12px !important;
+    padding: 6px 8px !important;
+    white-space: nowrap;
+  }
+
+  /* Prevent iOS input zoom (font-size must be >= 16px) */
+  .selectize-input, .selectize-input input,
+  .form-control, .form-select,
   select, input[type='text'] { font-size: 16px !important; }
 
-  /* Cards: stack and shrink */
+  /* Cards: responsive wrap */
   .d-flex.flex-wrap { gap: 6px !important; }
-  .card { min-width: 100px !important; }
+  .card { min-width: 0 !important; flex: 1 1 45% !important; }
   .card .card-body { padding: 8px !important; }
-  .card .card-body h5 { font-size: 18px !important; }
+  .card .card-body h5 { font-size: 16px !important; }
+  .card .card-body .text-muted { font-size: 11px !important; }
 
-  /* Tables: ensure horizontal scroll */
-  .dataTables_wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-
-  /* Plotly: touch-friendly */
+  /* Map & chart: proportional to screen */
   .plotly .modebar { display: none !important; }
+  .js-plotly-plot { height: 300px !important; }
+  .visNetwork { height: 350px !important; }
 
   /* Two-column rows: stack vertically */
-  .col-sm-6 { width: 100% !important; flex: 0 0 100% !important; max-width: 100% !important; }
+  .row > .col-sm-6, .row > [class*='col-'] {
+    width: 100% !important; flex: 0 0 100% !important;
+    max-width: 100% !important;
+  }
 
-  /* Content spacing */
+  /* Tables: horizontal scroll */
+  .dataTables_wrapper {
+    overflow-x: auto; -webkit-overflow-scrolling: touch;
+    font-size: 13px;
+  }
+
+  /* Spacing */
   .container-fluid { padding: 8px !important; }
-  .tab-content { padding: 0 !important; }
   h3 { font-size: 18px !important; }
-  h5 { font-size: 15px !important; }
+  h5 { font-size: 14px !important; }
 }
 
-/* Touch devices: larger tap targets */
+/* ── Touch devices: bigger tap targets ── */
 @media (hover: none) and (pointer: coarse) {
   .selectize-input { min-height: 44px !important; }
+  .selectize-input input { min-height: 36px !important; }
   .btn { min-height: 44px !important; font-size: 15px !important; }
-  .form-select, .form-control { min-height: 40px !important; }
-  .selectize-dropdown-content .option { padding: 10px 12px !important; }
+  .form-select, .form-control { min-height: 44px !important; }
+  .selectize-dropdown-content .option { padding: 12px !important; }
+  .nav-link { min-height: 44px !important; display: flex; align-items: center; }
 }
+"
+
+# JavaScript for loading overlay + button busy states
+APP_JS <- "
+$(document).on('shiny:connected', function() {
+  // Hide overlay once first output renders (metadata loaded)
+  $(document).one('shiny:value', function() {
+    $('#loading-overlay').addClass('loaded');
+    setTimeout(function() { $('#loading-overlay').remove(); }, 500);
+  });
+});
+
+// Button loading states during computation
+$(document).on('shiny:busy', function() {
+  $('.btn-primary').addClass('btn-loading');
+});
+$(document).on('shiny:idle', function() {
+  $('.btn-primary').removeClass('btn-loading');
+});
 "
 
 ui <- page_navbar(
@@ -200,17 +324,27 @@ ui <- page_navbar(
     "navbar-bg" = RMI_BLUE,
     base_font = font_google("Source Sans Pro")
   ),
-  fillable = TRUE,
-  header = tags$head(
-    tags$meta(name = "viewport",
-              content = "width=device-width, initial-scale=1.0, viewport-fit=cover"),
-    tags$style(HTML(MOBILE_CSS))
+  fillable = FALSE,
+  header = tagList(
+    tags$head(
+      tags$meta(name = "viewport",
+                content = "width=device-width, initial-scale=1.0, viewport-fit=cover"),
+      tags$style(HTML(APP_CSS)),
+      tags$script(HTML(APP_JS))
+    ),
+    # Loading overlay — visible until metadata loads
+    tags$div(id = "loading-overlay",
+      tags$div(class = "rmi-spinner"),
+      tags$div(class = "loading-text", "Loading Clean Growth Tool...")
+    ),
+    # Top busy bar — visible during any Shiny computation
+    tags$div(class = "busy-bar")
   ),
 
   # ── Tab 1: Regional View ────────────────────────────────────────────────
-  nav_panel("Regional View",
+  nav_panel("Regional",
     layout_sidebar(
-      sidebar = sidebar(width = 300, open = "desktop",
+      sidebar = sidebar(width = 300,
         selectInput("reg_level", "Geography Level",
                     setNames(names(LEVEL_LABELS), LEVEL_LABELS), "county"),
         selectizeInput("reg_geo", "Search Geography", choices = NULL,
@@ -222,9 +356,9 @@ ui <- page_navbar(
   ),
 
   # ── Tab 2: National View ────────────────────────────────────────────────
-  nav_panel("National View",
+  nav_panel("National",
     layout_sidebar(
-      sidebar = sidebar(width = 300, open = "desktop",
+      sidebar = sidebar(width = 300,
         selectInput("nat_level", "Geography Level",
                     setNames(names(LEVEL_LABELS), LEVEL_LABELS), "county"),
         conditionalPanel("input.nat_level == 'county'",
@@ -252,7 +386,7 @@ ui <- page_navbar(
   # ── Tab 3: Industry Space ───────────────────────────────────────────────
   nav_panel("Industry Space",
     layout_sidebar(
-      sidebar = sidebar(width = 300, open = "desktop",
+      sidebar = sidebar(width = 300,
         selectInput("is_level", "Geography Level",
                     setNames(names(LEVEL_LABELS), LEVEL_LABELS), "county"),
         selectizeInput("is_geo", "Highlight Geography", choices = NULL,
@@ -411,9 +545,12 @@ server <- function(input, output, session) {
   output$reg_ui <- renderUI({
     rd <- reg_data()
     if (is.null(rd)) {
-      return(tags$div(class = "text-center text-muted mt-5",
-        tags$h3("Select a Geography"),
-        tags$p("Choose a level and search for a region to view its profile.")
+      return(tags$div(class = "loading-placeholder",
+        tags$h4("Select a Geography",
+                style = paste0("color:", RMI_BLUE, ";")),
+        tags$p(class = "text-muted",
+               "Choose a geography level and search for a region, then click",
+               tags$strong("Load Data."))
       ))
     }
 
@@ -556,14 +693,16 @@ server <- function(input, output, session) {
   output$nat_ui <- renderUI({
     nd <- nat_data()
     if (is.null(nd)) {
-      return(tags$div(class = "text-center text-muted mt-5",
-        tags$h3("National Comparison"),
-        tags$p("Select filters and click Load Data.")
+      return(tags$div(class = "loading-placeholder",
+        tags$h4("National Comparison",
+                style = paste0("color:", RMI_BLUE, ";")),
+        tags$p(class = "text-muted",
+               "Select filters and click", tags$strong("Load Data."))
       ))
     }
     tagList(
       tags$h3(nd$title, style = paste0("color:", RMI_BLUE, ";")),
-      plotlyOutput("nat_map", height = "min(550px, 60vw)"),
+      plotlyOutput("nat_map", height = "550px"),
       uiOutput("nat_cards"),
       fluidRow(
         column(6, DTOutput("nat_table")),
@@ -589,7 +728,7 @@ server <- function(input, output, session) {
     if (level == "state") {
       # Use plotly's built-in US state map (no GeoJSON needed)
       # Need state abbreviations
-      if (!"state_abbr" %in% names(data) && nrow(meta$crosswalk) > 0) {
+      if (!"state_abbreviation" %in% names(data) && nrow(meta$crosswalk) > 0) {
         st_map <- meta$crosswalk %>%
           distinct(state_fips, state_abbreviation)
         data <- data %>%
@@ -797,8 +936,8 @@ server <- function(input, output, session) {
         label = ifelse(nchar(industry_description) > 20,
                        paste0(substr(industry_description, 1, 17), "..."),
                        industry_description),
-        title = paste0("<b>", industry_code, "</b><br>",
-                       industry_description, "<br>",
+        title = paste0("<b>", htmltools::htmlEscape(industry_code), "</b><br>",
+                       htmltools::htmlEscape(industry_description), "<br>",
                        "Complexity: ", sprintf("%.2f", industry_complexity)),
         value = industry_centrality * 1000,
         color = ifelse(id %in% rca_codes, "#1f78b4", "#cccccc"),
@@ -819,9 +958,12 @@ server <- function(input, output, session) {
   output$is_ui <- renderUI({
     isd <- is_data()
     if (is.null(isd)) {
-      return(tags$div(class = "text-center text-muted mt-5",
-        tags$h3("Industry Space"),
-        tags$p("Select a geography level and click Load Network.")))
+      return(tags$div(class = "loading-placeholder",
+        tags$h4("Industry Space",
+                style = paste0("color:", RMI_BLUE, ";")),
+        tags$p(class = "text-muted",
+               "Select a geography level and click", tags$strong("Load Network."))
+      ))
     }
 
     geo_name <- ""
@@ -832,7 +974,7 @@ server <- function(input, output, session) {
     tagList(
       tags$h3(paste0("Industry Space", geo_name),
               style = paste0("color:", RMI_BLUE, ";")),
-      visNetworkOutput("is_network", height = "min(550px, 70vw)"),
+      visNetworkOutput("is_network", height = "550px"),
       fluidRow(
         column(6, plotlyOutput("is_hist", height = "280px")),
         column(6, DTOutput("is_table"))

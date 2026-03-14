@@ -137,6 +137,15 @@ body {
   transition: background .2s;
 }
 .btn:hover { background: var(--energy-dark); }
+.btn:disabled, .btn.loading { opacity: .6; pointer-events: none; }
+.btn.loading::after {
+  content: ''; display: inline-block;
+  width: 12px; height: 12px; margin-left: 8px;
+  border: 2px solid var(--blue-spruce); border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin .6s linear infinite;
+  vertical-align: middle;
+}
 
 /* ── Cards ── */
 .cards { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
@@ -224,10 +233,13 @@ body {
   display: none;
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(255,255,255,.65);
+  background: rgba(255,255,255,.85);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   z-index: 9999;
   align-items: center;
   justify-content: center;
+  flex-direction: column;
 }
 .spinner-overlay.visible { display: flex; }
 .spinner {
@@ -278,8 +290,9 @@ body {
 }
 @media (max-width: 700px) {
   .main-wrap { flex-direction: column; }
-  .sidebar { width: 100%; min-width: 100%; max-height: 260px; border-right: none; border-bottom: 1px solid var(--light-gray); }
+  .sidebar { width: 100%; min-width: 100%; max-height: none; border-right: none; border-bottom: 1px solid var(--light-gray); }
   .header-subtitle { display: none; }
+  .card { min-width: 140px; }
 }
 
 /* ── Mobile-specific (iPhone / small touch screens) ── */
@@ -314,11 +327,15 @@ body {
     border-right: none;
     border-bottom: 1px solid var(--light-gray);
     padding: 12px;
-    overflow-y: visible;
+    overflow: hidden;
+    transition: max-height .3s ease, padding .3s ease;
   }
-  .sidebar.collapsed > *:not(.sidebar-toggle) { display: none; }
-  .sidebar.collapsed { max-height: none; padding: 12px; }
+  .sidebar.collapsed { max-height: 52px; padding: 12px 12px 4px; }
+  .sidebar.collapsed > *:not(.sidebar-toggle) { opacity: 0; pointer-events: none; height: 0; margin: 0; padding: 0; overflow: hidden; }
   .sidebar-toggle { display: block; }
+
+  /* Cards: fit two per row on phones */
+  .card { min-width: 0; flex: 1 1 calc(50% - 8px); }
 
   /* Content area */
   .content { padding: 12px; }
@@ -513,8 +530,16 @@ body {
 </head>
 <body>
 
-<!-- Spinner -->
-<div class="spinner-overlay" id="spinner"><div class="spinner"></div></div>
+<!-- Loading overlay with progress -->
+<div class="spinner-overlay" id="spinner">
+  <div style="text-align:center;">
+    <div class="spinner"></div>
+    <div id="load-status" style="margin-top:16px;font-size:15px;color:var(--basalt);font-weight:500;"></div>
+    <div id="load-bar-wrap" style="width:220px;height:4px;background:var(--light-gray);border-radius:2px;margin:10px auto 0;overflow:hidden;display:none;">
+      <div id="load-bar" style="width:0%;height:100%;background:var(--energy);border-radius:2px;transition:width .3s ease;"></div>
+    </div>
+  </div>
+</div>
 
 <!-- Header -->
 <div class="header">
@@ -785,8 +810,30 @@ function buildExportBar(plotEl, filename, getDataFn) {
 // ════════════════════════════════════════════
 //  UTILITIES
 // ════════════════════════════════════════════
-function showSpinner() { document.getElementById('spinner').classList.add('visible'); }
-function hideSpinner() { document.getElementById('spinner').classList.remove('visible'); }
+function showSpinner(msg) {
+  document.getElementById('spinner').classList.add('visible');
+  if (msg) setLoadStatus(msg);
+  // Disable all action buttons while loading
+  document.querySelectorAll('.btn').forEach(b => b.classList.add('loading'));
+}
+function hideSpinner() {
+  document.getElementById('spinner').classList.remove('visible');
+  setLoadStatus('');
+  setLoadProgress(-1);
+  document.querySelectorAll('.btn').forEach(b => b.classList.remove('loading'));
+}
+function setLoadStatus(msg) {
+  const el = document.getElementById('load-status');
+  if (el) el.textContent = msg || '';
+}
+function setLoadProgress(pct) {
+  const wrap = document.getElementById('load-bar-wrap');
+  const bar = document.getElementById('load-bar');
+  if (!wrap || !bar) return;
+  if (pct < 0) { wrap.style.display = 'none'; bar.style.width = '0%'; return; }
+  wrap.style.display = 'block';
+  bar.style.width = Math.min(100, Math.round(pct)) + '%';
+}
 
 async function fetchCSV(relPath) {
   if (CACHE.has(relPath)) return CACHE.get(relPath);
@@ -1145,7 +1192,7 @@ document.getElementById('reg-level').addEventListener('change', () => {
 });
 
 async function loadRegional(level, geoid) {
-  showSpinner();
+  showSpinner('Loading regional data...');
   try {
     const data = await fetchCSVGz('by_geography/' + level + '/' + padGeoid(geoid, level) + '.csv.gz');
     const geoRec = getGeoRecord(geoid, level);
@@ -2000,51 +2047,32 @@ async function renderCountyMap(plotEl, dataMap, metricKey, metricLabel, level, p
     }
   } catch(e) { /* state boundaries optional */ }
 
-  // Draw CBSA/CSA/CZ region boundary overlays
-  if (level !== 'county') {
+  // Draw CBSA/CSA/CZ region boundary overlays using topojson.mesh
+  if (level !== 'county' && countyTopoJSON) {
     try {
-      // Group features by parent region, then merge to create region outlines
-      const regionGroups = new Map();
-      geojson.features.forEach(f => {
-        const regionId = countyRegionMap.get(f.id);
-        if (!regionId) return;
-        if (!regionGroups.has(regionId)) regionGroups.set(regionId, []);
-        regionGroups.get(regionId).push(f);
-      });
-      regionGroups.forEach((features, regionId) => {
-        if (features.length === 0) return;
-        // Draw thicker outline around each region's counties
-        mapG.append('g')
-          .attr('class', 'region-outline')
-          .selectAll('path')
-          .data(features)
-          .join('path')
-          .attr('d', path)
-          .attr('fill', 'none')
-          .attr('stroke', 'none')
-          .style('pointer-events', 'none');
-      });
-      // Use topojson merge approach: build a simple topology from the grouped features
-      // Simpler: just draw county borders thicker within each region group
-      // Actually, the best approach: draw the outer boundary of each region by finding counties that border other regions
-      regionGroups.forEach((features, regionId) => {
-        if (features.length <= 0) return;
-        const fc = { type: 'FeatureCollection', features: features };
-        // Create a single merged path for the region boundary
-        mapG.append('path')
-          .attr('class', 'region-boundary')
-          .datum(fc)
-          .attr('d', d => {
-            // Draw outer boundary only by using a clip approach
-            // Simple: draw all county paths within the group with a thick stroke
-            return features.map(f => path(f)).join(' ');
-          })
-          .attr('fill', 'none')
-          .attr('stroke', '#222')
-          .attr('stroke-width', 1.5)
-          .attr('stroke-linejoin', 'round')
-          .style('pointer-events', 'none');
-      });
+      // Use topojson.mesh with a filter: only draw boundaries between
+      // counties in different regions (= the outer boundary of each region)
+      const regionMesh = topojson.mesh(
+        countyTopoJSON,
+        countyTopoJSON.objects.counties,
+        (a, b) => {
+          const rA = countyRegionMap.get(String(a.id).padStart(5, '0'));
+          const rB = countyRegionMap.get(String(b.id).padStart(5, '0'));
+          // Draw edge when: one is in a region and the other isn't,
+          // or they're in different regions
+          return rA !== rB;
+        }
+      );
+      mapG.append('path')
+        .attr('class', 'region-boundary')
+        .datum(regionMesh)
+        .attr('d', path)
+        .attr('fill', 'none')
+        .attr('stroke', '#333')
+        .attr('stroke-width', 1.8)
+        .attr('stroke-linejoin', 'round')
+        .attr('stroke-opacity', 0.7)
+        .style('pointer-events', 'none');
     } catch(e) { console.warn('Region boundaries failed:', e); }
   }
 
@@ -2162,7 +2190,7 @@ function zoomToState(stateFips) {
 async function loadNational() {
   const level = document.getElementById('nat-level').value;
   const mode = document.getElementById('nat-mode').value;
-  showSpinner();
+  showSpinner('Loading national data...');
 
   try {
     if (!metaGeo) metaGeo = await fetchCSV('meta/geography_specific.csv');
@@ -2493,7 +2521,7 @@ function runForceLayout(nodes, edges, levelCode) {
 }
 
 async function loadIndustrySpace() {
-  showSpinner();
+  showSpinner('Building industry network...');
   try {
     const level = document.getElementById('is-level').value;
     const threshPct = parseInt(document.getElementById('is-threshold').value);
@@ -2785,12 +2813,33 @@ loadIndustrySpace = async function() {
 //  INIT
 // ════════════════════════════════════════════
 (async function init() {
-  showSpinner();
-  // Pre-fetch GeoJSON in parallel with other init work
-  fetchGeoJSON().catch(e => console.warn('GeoJSON prefetch failed:', e));
+  showSpinner('Loading map boundaries...');
+  setLoadProgress(0);
+  // Pre-fetch GeoJSON in parallel with metadata
+  const geoPromise = fetchGeoJSON().catch(e => console.warn('GeoJSON prefetch failed:', e));
+  setLoadProgress(10);
+
+  setLoadStatus('Loading metadata...');
+  try { await ensureMeta(); } catch (err) { console.error('Metadata load failed:', err); }
+  setLoadProgress(40);
+
+  setLoadStatus('Preparing Regional View...');
   try { await initRegional(); } catch (err) { console.error('Regional init failed:', err); }
+  setLoadProgress(60);
+
+  setLoadStatus('Preparing National View...');
   try { await initNational(); } catch (err) { console.error('National init failed:', err); }
+  setLoadProgress(75);
+
+  setLoadStatus('Preparing Industry Space...');
   try { await initIndustrySpace(); } catch (err) { console.error('Industry Space init failed:', err); }
+  setLoadProgress(90);
+
+  // Wait for GeoJSON if still loading
+  setLoadStatus('Finalizing...');
+  await geoPromise;
+  setLoadProgress(100);
+
   // Apply deep link if present
   try { await applyHash(); } catch (err) { console.error('Hash routing failed:', err); }
   hideSpinner();
