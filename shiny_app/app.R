@@ -136,6 +136,56 @@ RMI_ENERGY <- "#45CFCC"
 # ══════════════════════════════════════════════════════════════════════════════
 #  UI
 # ══════════════════════════════════════════════════════════════════════════════
+MOBILE_CSS <- "
+/* ── Mobile responsive overrides ── */
+@media (max-width: 600px) {
+  /* Navbar: compact */
+  .navbar-brand { font-size: 15px !important; }
+  .navbar-brand img { height: 22px !important; }
+  .nav-link { font-size: 13px; padding: 8px 10px !important; }
+
+  /* Sidebar: narrower on mobile */
+  .bslib-sidebar-layout > .sidebar {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: none !important;
+  }
+
+  /* Prevent iOS input zoom (needs >= 16px) */
+  .selectize-input, .form-control, .form-select,
+  select, input[type='text'] { font-size: 16px !important; }
+
+  /* Cards: stack and shrink */
+  .d-flex.flex-wrap { gap: 6px !important; }
+  .card { min-width: 100px !important; }
+  .card .card-body { padding: 8px !important; }
+  .card .card-body h5 { font-size: 18px !important; }
+
+  /* Tables: ensure horizontal scroll */
+  .dataTables_wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* Plotly: touch-friendly */
+  .plotly .modebar { display: none !important; }
+
+  /* Two-column rows: stack vertically */
+  .col-sm-6 { width: 100% !important; flex: 0 0 100% !important; max-width: 100% !important; }
+
+  /* Content spacing */
+  .container-fluid { padding: 8px !important; }
+  .tab-content { padding: 0 !important; }
+  h3 { font-size: 18px !important; }
+  h5 { font-size: 15px !important; }
+}
+
+/* Touch devices: larger tap targets */
+@media (hover: none) and (pointer: coarse) {
+  .selectize-input { min-height: 44px !important; }
+  .btn { min-height: 44px !important; font-size: 15px !important; }
+  .form-select, .form-control { min-height: 40px !important; }
+  .selectize-dropdown-content .option { padding: 10px 12px !important; }
+}
+"
+
 ui <- page_navbar(
   title = tags$span(
     tags$img(
@@ -151,11 +201,16 @@ ui <- page_navbar(
     base_font = font_google("Source Sans Pro")
   ),
   fillable = TRUE,
+  header = tags$head(
+    tags$meta(name = "viewport",
+              content = "width=device-width, initial-scale=1.0, viewport-fit=cover"),
+    tags$style(HTML(MOBILE_CSS))
+  ),
 
   # ── Tab 1: Regional View ────────────────────────────────────────────────
   nav_panel("Regional View",
     layout_sidebar(
-      sidebar = sidebar(width = 320,
+      sidebar = sidebar(width = 300, open = "desktop",
         selectInput("reg_level", "Geography Level",
                     setNames(names(LEVEL_LABELS), LEVEL_LABELS), "county"),
         selectizeInput("reg_geo", "Search Geography", choices = NULL,
@@ -169,7 +224,7 @@ ui <- page_navbar(
   # ── Tab 2: National View ────────────────────────────────────────────────
   nav_panel("National View",
     layout_sidebar(
-      sidebar = sidebar(width = 320,
+      sidebar = sidebar(width = 300, open = "desktop",
         selectInput("nat_level", "Geography Level",
                     setNames(names(LEVEL_LABELS), LEVEL_LABELS), "county"),
         conditionalPanel("input.nat_level == 'county'",
@@ -197,7 +252,7 @@ ui <- page_navbar(
   # ── Tab 3: Industry Space ───────────────────────────────────────────────
   nav_panel("Industry Space",
     layout_sidebar(
-      sidebar = sidebar(width = 320,
+      sidebar = sidebar(width = 300, open = "desktop",
         selectInput("is_level", "Geography Level",
                     setNames(names(LEVEL_LABELS), LEVEL_LABELS), "county"),
         selectizeInput("is_geo", "Highlight Geography", choices = NULL,
@@ -371,7 +426,8 @@ server <- function(input, output, session) {
     if (nrow(geo_rec) > 0) {
       r <- geo_rec[1, ]
       make_card <- function(lbl, val, sub = "") {
-        tags$div(class = "card text-center m-1", style = "min-width:150px;",
+        tags$div(class = "card text-center m-1",
+                 style = "min-width:100px; flex:1 1 auto;",
           tags$div(class = "card-body py-2",
             tags$small(class = "text-muted", lbl),
             tags$h5(val, style = paste0("color:", RMI_BLUE, ";")),
@@ -507,11 +563,11 @@ server <- function(input, output, session) {
     }
     tagList(
       tags$h3(nd$title, style = paste0("color:", RMI_BLUE, ";")),
-      plotlyOutput("nat_map", height = "550px"),
+      plotlyOutput("nat_map", height = "min(550px, 60vw)"),
       uiOutput("nat_cards"),
       fluidRow(
         column(6, DTOutput("nat_table")),
-        column(6, plotlyOutput("nat_hist", height = "350px"))
+        column(6, plotlyOutput("nat_hist", height = "300px"))
       )
     )
   })
@@ -645,7 +701,8 @@ server <- function(input, output, session) {
     if (length(vals) == 0) return(NULL)
 
     mc <- function(lbl, val) {
-      tags$div(class = "card text-center m-1", style = "min-width:120px;",
+      tags$div(class = "card text-center m-1",
+               style = "min-width:80px; flex:1 1 auto;",
         tags$div(class = "card-body py-2",
           tags$small(class = "text-muted", lbl),
           tags$h5(val, style = paste0("color:", RMI_BLUE, ";"))
@@ -775,9 +832,9 @@ server <- function(input, output, session) {
     tagList(
       tags$h3(paste0("Industry Space", geo_name),
               style = paste0("color:", RMI_BLUE, ";")),
-      visNetworkOutput("is_network", height = "550px"),
+      visNetworkOutput("is_network", height = "min(550px, 70vw)"),
       fluidRow(
-        column(6, plotlyOutput("is_hist", height = "300px")),
+        column(6, plotlyOutput("is_hist", height = "280px")),
         column(6, DTOutput("is_table"))
       )
     )
