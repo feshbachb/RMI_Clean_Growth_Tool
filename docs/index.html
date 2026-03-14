@@ -4,617 +4,271 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>RMI Clean Growth Tool</title>
-<link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@300;400;600;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
-  --blue-spruce: #003B63;
+  --blue: #003B63;
   --energy: #45CFCC;
-  --basalt: #58595B;
-  --white: #FFFFFF;
-  --light-gray: #E6E7E8;
-  --energy-dark: #35b5b2;
-  --sidebar-width: 320px;
+  --gray: #58595B;
+  --light: #E6E7E8;
 }
-html, body { height: 100%; }
 body {
-  font-family: 'Source Sans Pro', 'Roboto', sans-serif;
-  color: var(--basalt);
+  font-family: 'Source Sans Pro', sans-serif;
+  color: var(--gray);
   background: #f5f6f7;
   display: flex;
   flex-direction: column;
+  min-height: 100vh;
 }
 
-/* ── Header / Nav ── */
+/* Header */
 .header {
-  background: var(--blue-spruce);
-  color: var(--white);
+  background: var(--blue);
+  color: #fff;
   display: flex;
   align-items: center;
   padding: 0 24px;
   height: 56px;
-  flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(0,0,0,.25);
-  z-index: 100;
+  gap: 16px;
 }
-.header-logo {
-  display: flex;
-  align-items: center;
-  margin-right: 16px;
-  text-decoration: none;
-  flex-shrink: 0;
-}
-.header-title {
-  font-size: 20px;
-  font-weight: 700;
-  letter-spacing: .5px;
-  margin-right: 40px;
-  white-space: nowrap;
-}
-.header-subtitle {
-  font-size: 13px;
-  font-weight: 300;
-  opacity: .75;
-  margin-right: 40px;
-  white-space: nowrap;
-}
+.header img { height: 32px; }
+.header h1 { font-size: 20px; font-weight: 700; white-space: nowrap; }
 .tab-bar { display: flex; gap: 4px; margin-left: auto; }
 .tab-btn {
   background: transparent;
   border: none;
-  color: rgba(255,255,255,.7);
-  font-family: inherit;
-  font-size: 14px;
-  font-weight: 600;
+  color: rgba(255,255,255,.65);
+  font: 600 14px 'Source Sans Pro', sans-serif;
   padding: 16px 20px;
   cursor: pointer;
   border-bottom: 3px solid transparent;
-  transition: all .2s;
 }
-.tab-btn:hover { color: var(--white); background: rgba(255,255,255,.08); }
+.tab-btn:hover { color: #fff; }
 .tab-btn.active { color: var(--energy); border-bottom-color: var(--energy); }
 
-/* ── Layout ── */
-.main-wrap { display: flex; flex: 1; overflow: hidden; }
+/* Layout */
+.main { display: flex; flex: 1; overflow: hidden; }
 .sidebar {
-  width: var(--sidebar-width);
-  min-width: var(--sidebar-width);
-  background: var(--white);
-  border-right: 1px solid var(--light-gray);
+  width: 300px;
+  min-width: 300px;
+  background: #fff;
+  border-right: 1px solid var(--light);
   padding: 20px;
   overflow-y: auto;
-  flex-shrink: 0;
 }
-.content {
-  flex: 1;
-  overflow-y: auto;
-  padding: 24px;
-}
-.sidebar h3 {
-  font-size: 13px;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: var(--blue-spruce);
-  margin-bottom: 8px;
-  margin-top: 18px;
-}
-.sidebar h3:first-child { margin-top: 0; }
-.sidebar label {
-  display: block;
-  font-size: 13px;
-  font-weight: 600;
-  margin-bottom: 4px;
-  color: var(--basalt);
-}
-.sidebar select, .sidebar input[type="text"], .sidebar input[type="range"] {
+.content { flex: 1; overflow-y: auto; padding: 24px; }
+
+/* Sidebar controls */
+.sidebar label { display: block; font-size: 13px; font-weight: 600; margin: 12px 0 4px; }
+.sidebar label:first-child { margin-top: 0; }
+.sidebar select, .sidebar input[type="text"] {
   width: 100%;
-  padding: 8px 10px;
-  border: 1px solid var(--light-gray);
+  padding: 8px;
+  border: 1px solid var(--light);
   border-radius: 4px;
-  font-family: inherit;
-  font-size: 14px;
-  margin-bottom: 12px;
-  background: var(--white);
+  font: 14px 'Source Sans Pro', sans-serif;
 }
 .sidebar select:focus, .sidebar input:focus { outline: none; border-color: var(--energy); }
-.sidebar .hint { font-size: 11px; color: #999; margin-top: -8px; margin-bottom: 10px; }
 .btn {
-  display: inline-block;
-  padding: 8px 18px;
+  display: block;
+  width: 100%;
+  padding: 10px;
+  margin-top: 16px;
   background: var(--energy);
-  color: var(--blue-spruce);
+  color: var(--blue);
   border: none;
   border-radius: 4px;
-  font-family: inherit;
-  font-size: 14px;
-  font-weight: 600;
+  font: 600 14px 'Source Sans Pro', sans-serif;
   cursor: pointer;
-  transition: background .2s;
 }
-.btn:hover { background: var(--energy-dark); }
-.btn:disabled, .btn.loading { opacity: .6; pointer-events: none; }
-.btn.loading::after {
-  content: ''; display: inline-block;
-  width: 12px; height: 12px; margin-left: 8px;
-  border: 2px solid var(--blue-spruce); border-top-color: transparent;
-  border-radius: 50%;
-  animation: spin .6s linear infinite;
-  vertical-align: middle;
-}
+.btn:hover { background: #35b5b2; }
+.btn:disabled { opacity: .5; cursor: default; }
 
-/* ── Cards ── */
-.cards { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+/* Cards */
+.cards { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
 .card {
-  background: var(--white);
+  background: #fff;
   border-radius: 8px;
-  padding: 18px 22px;
-  min-width: 180px;
+  padding: 16px 20px;
   flex: 1;
+  min-width: 150px;
   box-shadow: 0 1px 4px rgba(0,0,0,.08);
 }
-.card-label { font-size: 12px; text-transform: uppercase; letter-spacing: .8px; color: #999; margin-bottom: 4px; }
-.card-value { font-size: 28px; font-weight: 700; color: var(--blue-spruce); }
-.card-sub { font-size: 13px; color: var(--basalt); margin-top: 2px; }
+.card-label { font-size: 11px; text-transform: uppercase; letter-spacing: .8px; color: #999; }
+.card-value { font-size: 26px; font-weight: 700; color: var(--blue); }
+.card-sub { font-size: 13px; color: var(--gray); }
 
-/* ── Section titles ── */
-.section-title {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--blue-spruce);
-  margin: 24px 0 12px;
-  border-bottom: 2px solid var(--energy);
-  padding-bottom: 6px;
-}
-.section-title:first-child { margin-top: 0; }
-
-/* ── Tables ── */
-.table-wrap {
-  background: var(--white);
+/* Tables */
+.tbl-wrap {
+  background: #fff;
   border-radius: 8px;
   box-shadow: 0 1px 4px rgba(0,0,0,.08);
   overflow-x: auto;
-  overflow-y: hidden;
-  -webkit-overflow-scrolling: touch;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
-.table-wrap table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.table-wrap th {
-  background: var(--blue-spruce);
-  color: var(--white);
+.tbl-wrap table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tbl-wrap th {
+  background: var(--blue);
+  color: #fff;
   padding: 10px 12px;
   text-align: left;
   font-weight: 600;
   cursor: pointer;
-  user-select: none;
   white-space: nowrap;
-  position: relative;
 }
-.table-wrap th:hover { background: #00507f; }
-.table-wrap th .sort-arrow { margin-left: 4px; font-size: 10px; opacity: .6; }
-.table-wrap th.sorted .sort-arrow { opacity: 1; }
-.table-wrap td { padding: 8px 12px; border-bottom: 1px solid var(--light-gray); }
-.table-wrap tr:hover td { background: #f0fafa; }
-.table-wrap .no-data { padding: 24px; text-align: center; color: #999; }
-.table-info { font-size: 12px; color: #999; margin-bottom: 4px; }
+.tbl-wrap th:hover { background: #004d80; }
+.tbl-wrap td { padding: 8px 12px; border-bottom: 1px solid var(--light); }
+.tbl-wrap tr:hover td { background: #f0fafa; }
 
-/* ── Chart ── */
-.chart-container {
-  background: var(--white);
+/* Chart wrapper */
+.chart-wrap {
+  background: #fff;
   border-radius: 8px;
   box-shadow: 0 1px 4px rgba(0,0,0,.08);
   padding: 12px;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
-/* ── Spinner ── */
-.map-tooltip {
-  position: absolute;
-  pointer-events: none;
-  background: rgba(255,255,255,.97);
-  border: 1px solid #d0d5dd;
-  border-radius: 8px;
-  padding: 10px 14px;
-  font-size: 13px;
-  line-height: 1.5;
-  box-shadow: 0 4px 16px rgba(0,0,0,.12), 0 1px 3px rgba(0,0,0,.08);
-  z-index: 1000;
-  display: none;
-  max-width: 280px;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+/* Section title */
+.sec-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--blue);
+  margin: 20px 0 10px;
+  padding-bottom: 4px;
+  border-bottom: 2px solid var(--energy);
 }
-.map-tooltip b { color: var(--blue-spruce); }
-.spinner-overlay {
+
+/* Panels */
+.panel { display: none; }
+.panel.active { display: flex; flex: 1; overflow: hidden; }
+
+/* Empty state */
+.empty { text-align: center; padding: 60px 20px; color: #999; }
+.empty h2 { color: var(--blue); margin-bottom: 8px; }
+
+/* Spinner */
+.spinner-bg {
+  position: fixed; inset: 0;
+  background: rgba(255,255,255,.9);
+  z-index: 999;
   display: none;
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(255,255,255,.85);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  z-index: 9999;
   align-items: center;
   justify-content: center;
   flex-direction: column;
+  gap: 12px;
 }
-.spinner-overlay.visible { display: flex; }
-.spinner {
-  width: 48px; height: 48px;
-  border: 5px solid var(--light-gray);
+.spinner-bg.visible { display: flex; }
+.spin {
+  width: 44px; height: 44px;
+  border: 4px solid var(--light);
   border-top-color: var(--energy);
   border-radius: 50%;
   animation: spin .7s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+#spin-msg { font-size: 15px; color: var(--gray); font-weight: 500; }
 
-/* ── Tab panels ── */
-.tab-panel { display: none; }
-.tab-panel.active { display: flex; flex: 1; overflow: hidden; }
-
-/* ── Mobile menu button (hidden on desktop) ── */
-.mobile-menu-btn {
-  display: none;
-  background: none;
-  border: none;
-  color: var(--white);
-  font-size: 24px;
-  padding: 8px;
-  cursor: pointer;
-  margin-left: auto;
-}
-/* ── Sidebar toggle for mobile ── */
-.sidebar-toggle {
-  display: none;
-  width: 100%;
-  background: var(--energy);
-  color: var(--blue-spruce);
-  border: none;
-  padding: 10px 16px;
-  font-family: inherit;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  border-radius: 6px;
-  margin-bottom: 12px;
-  text-align: center;
-}
-
-/* ── Responsive ── */
-@media (max-width: 900px) {
-  .sidebar { width: 260px; min-width: 260px; }
-  .cards { flex-direction: column; }
-}
-@media (max-width: 700px) {
-  .main-wrap { flex-direction: column; }
-  .sidebar { width: 100%; min-width: 100%; max-height: none; border-right: none; border-bottom: 1px solid var(--light-gray); }
-  .header-subtitle { display: none; }
-  .card { min-width: 140px; }
-}
-
-/* ── Mobile-specific (iPhone / small touch screens) ── */
-@media (max-width: 600px) {
-  /* Header: compact layout */
-  .header { padding: 0 12px; height: 50px; }
-  .header-title { font-size: 16px; margin-right: 8px; }
-  .header-subtitle { display: none; }
-
-  /* Hamburger menu */
-  .mobile-menu-btn { display: block; }
-  .tab-bar {
-    display: none;
-    position: absolute;
-    top: 50px;
-    left: 0; right: 0;
-    background: var(--blue-spruce);
-    flex-direction: column;
-    padding: 8px 0;
-    z-index: 200;
-    box-shadow: 0 4px 16px rgba(0,0,0,.3);
-  }
-  .tab-bar.open { display: flex; }
-  .tab-btn { padding: 14px 20px; text-align: left; border-bottom: none; }
-  .tab-btn.active { border-bottom: none; border-left: 3px solid var(--energy); }
-
-  /* Sidebar: collapsible drawer */
-  .sidebar {
-    width: 100% !important;
-    min-width: 100% !important;
-    max-height: none;
-    border-right: none;
-    border-bottom: 1px solid var(--light-gray);
-    padding: 12px;
-    overflow: hidden;
-    transition: max-height .3s ease, padding .3s ease;
-  }
-  .sidebar.collapsed { max-height: 52px; padding: 12px 12px 4px; }
-  .sidebar.collapsed > *:not(.sidebar-toggle) { opacity: 0; pointer-events: none; height: 0; margin: 0; padding: 0; overflow: hidden; }
-  .sidebar-toggle { display: block; }
-
-  /* Cards: fit two per row on phones */
-  .card { min-width: 0; flex: 1 1 calc(50% - 8px); }
-
-  /* Content area */
-  .content { padding: 12px; }
-  .main-wrap { flex-direction: column; }
-
-  /* Prevent iOS zoom on input focus (needs >= 16px) */
-  .sidebar input, .sidebar select,
-  .search-select-wrap input { font-size: 16px !important; }
-
-  /* Sidebar labels */
-  .sidebar h3 { font-size: 14px; }
-  .sidebar label { font-size: 14px; }
-  .sidebar .hint { font-size: 12px; }
-
-  /* Cards */
-  .cards { flex-direction: column; gap: 8px; }
-  .card { min-width: auto; }
-
-  /* Tables: horizontal scroll */
-  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-
-  /* Map container */
-  .map-container { padding: 10px; }
-  .map-controls { flex-wrap: wrap; }
-  .map-controls button { padding: 8px 12px; font-size: 13px; min-height: 36px; }
-  .map-controls .zoom-hint { display: none; }
-
-  /* Export bar */
-  .export-bar button { padding: 6px 10px; min-height: 36px; }
-
-  /* Tooltips: slightly smaller on mobile */
-  .map-tooltip { max-width: 220px; font-size: 12px; }
-
-  /* Search dropdown: smaller on mobile */
-  .search-select-list { max-height: 200px; }
-  .search-select-item { padding: 10px 12px; font-size: 14px; min-height: 40px; }
-
-  /* Empty state */
-  .empty-state { padding: 30px 16px; }
-  .empty-state h2 { font-size: 18px; }
-  .empty-state p { font-size: 14px; }
-
-  /* Footer */
-  .site-footer { flex-direction: column; gap: 8px; padding: 10px 12px; text-align: center; }
-  .site-footer img { height: 22px; }
-
-  /* Range slider */
-  .range-label { font-size: 13px; }
-  input[type="range"] { height: 24px; }
-}
-
-/* Touch device: larger tap targets */
-@media (hover: none) and (pointer: coarse) {
-  .search-select-item { padding: 10px 12px; min-height: 44px; }
-  .map-controls button { min-height: 40px; padding: 8px 14px; }
-  .export-bar button { min-height: 36px; padding: 6px 12px; }
-  .tab-btn { padding: 14px 16px; }
-  .sidebar select, .sidebar input { min-height: 40px; }
-}
-
-/* search-select widget */
-.search-select-wrap { position: relative; margin-bottom: 12px; }
-.search-select-wrap input {
-  width: 100%;
-  padding: 8px 10px;
-  border: 1px solid var(--light-gray);
-  border-radius: 4px;
-  font-family: inherit;
-  font-size: 14px;
-}
-.search-select-wrap input:focus { outline: none; border-color: var(--energy); }
-.search-select-list {
+/* Search dropdown */
+.search-wrap { position: relative; }
+.search-wrap input { width: 100%; }
+.search-list {
   display: none;
   position: absolute;
-  top: 100%;
-  left: 0; right: 0;
-  max-height: 260px;
+  top: 100%; left: 0; right: 0;
+  max-height: 240px;
   overflow-y: auto;
-  background: var(--white);
-  border: 1px solid var(--light-gray);
+  background: #fff;
+  border: 1px solid var(--light);
   border-top: none;
-  border-radius: 0 0 4px 4px;
   z-index: 50;
   box-shadow: 0 4px 12px rgba(0,0,0,.12);
 }
-.search-select-list.open { display: block; }
-.search-select-item {
+.search-list.open { display: block; }
+.search-item {
   padding: 7px 10px;
   font-size: 13px;
   cursor: pointer;
 }
-.search-select-item:hover, .search-select-item.highlighted { background: #e8f8f8; }
-.search-select-item.selected { background: var(--energy); color: var(--blue-spruce); font-weight: 600; }
+.search-item:hover { background: #e8f8f8; }
 
-.empty-state {
-  text-align: center;
-  padding: 60px 24px;
-  color: #999;
-}
-.empty-state h2 { font-size: 22px; color: var(--blue-spruce); margin-bottom: 8px; }
-.empty-state p { font-size: 15px; }
-
-/* range label */
-.range-label { display: flex; justify-content: space-between; font-size: 12px; color: #999; margin-top: -8px; margin-bottom: 8px; }
-
-/* ── Map ── */
-.map-container {
-  background: var(--white);
-  border-radius: 8px;
-  box-shadow: 0 1px 4px rgba(0,0,0,.08);
-  padding: 16px;
-  margin-bottom: 20px;
-}
-.map-description {
-  font-size: 13px;
-  font-style: italic;
-  color: #666;
-  line-height: 1.5;
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--light-gray);
-}
-.map-actions {
-  display: flex;
-  gap: 16px;
-  margin-top: 8px;
-  font-size: 13px;
-}
-.map-actions a, .map-actions button {
-  color: var(--energy-dark);
-  text-decoration: none;
-  cursor: pointer;
-  background: none;
-  border: none;
-  font-family: inherit;
-  font-size: inherit;
-  padding: 0;
-}
-.map-actions a:hover, .map-actions button:hover { text-decoration: underline; }
-.export-bar { display: flex; gap: 12px; align-items: center; margin-top: 8px; font-size: 13px; flex-wrap: wrap; }
-.export-bar span { color: #999; font-weight: 600; }
-.export-bar button {
-  color: var(--energy-dark);
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 13px;
-  padding: 2px 6px;
-  border-radius: 3px;
-}
-.export-bar button:hover { background: #e8f8f8; text-decoration: underline; }
-
-/* ── Map controls ── */
-.map-controls { display: flex; gap: 8px; margin-bottom: 8px; }
-.map-controls button {
-  background: var(--white);
-  border: 1px solid var(--light-gray);
-  border-radius: 4px;
-  padding: 4px 12px;
-  font-family: inherit;
+/* Footer */
+.footer {
+  background: #fff;
+  border-top: 1px solid var(--light);
+  padding: 10px 24px;
   font-size: 12px;
-  font-weight: 600;
-  color: var(--basalt);
-  cursor: pointer;
-  transition: all .15s;
-}
-.map-controls button:hover { background: #e8f8f8; border-color: var(--energy); color: var(--blue-spruce); }
-.map-controls button.active { background: var(--energy); color: var(--blue-spruce); border-color: var(--energy-dark); }
-.map-controls .zoom-hint { font-size: 11px; color: #999; align-self: center; margin-left: 4px; }
-
-/* ── County path transitions ── */
-.county-path { transition: fill-opacity 0.2s ease; }
-
-/* ── Footer ── */
-.site-footer {
-  background: var(--white);
-  border-top: 2px solid var(--light-gray);
-  padding: 12px 24px;
+  color: #999;
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  flex-shrink: 0;
-  font-size: 13px;
-  color: var(--basalt);
+  align-items: center;
 }
-.footer-left { display: flex; align-items: center; gap: 8px; }
-.footer-left a { color: var(--energy-dark); text-decoration: none; }
-.footer-left a:hover { text-decoration: underline; }
-.footer-right svg { display: block; }
+
+/* Mobile */
+@media (max-width: 700px) {
+  .main { flex-direction: column; }
+  .sidebar { width: 100%; min-width: 100%; border-right: none; border-bottom: 1px solid var(--light); }
+  .header h1 { font-size: 16px; }
+  .tab-btn { font-size: 12px; padding: 12px 10px; }
+  .cards { flex-direction: column; }
+  .content { padding: 12px; }
+  .sidebar select, .sidebar input { font-size: 16px !important; }
+}
 </style>
 </head>
 <body>
 
-<!-- Loading overlay with progress -->
-<div class="spinner-overlay" id="spinner">
-  <div style="text-align:center;">
-    <div class="spinner"></div>
-    <div id="load-status" style="margin-top:16px;font-size:15px;color:var(--basalt);font-weight:500;"></div>
-    <div id="load-bar-wrap" style="width:220px;height:4px;background:var(--light-gray);border-radius:2px;margin:10px auto 0;overflow:hidden;display:none;">
-      <div id="load-bar" style="width:0%;height:100%;background:var(--energy);border-radius:2px;transition:width .3s ease;"></div>
-    </div>
-  </div>
+<div class="spinner-bg" id="spinner">
+  <div class="spin"></div>
+  <div id="spin-msg">Loading...</div>
 </div>
 
-<!-- Header -->
 <div class="header">
-  <a href="https://rmi.org" target="_blank" rel="noopener" class="header-logo" aria-label="RMI Home">
-    <img src="rmi_logo_white.svg" alt="RMI" height="36">
-  </a>
-  <div class="header-title">Clean Growth Tool</div>
-  <div class="header-subtitle">Economic Complexity Dashboard</div>
-  <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Toggle navigation">&#9776;</button>
-  <div class="tab-bar" id="tab-bar">
-    <button class="tab-btn" data-tab="regional" role="tab" aria-selected="false">Regional View</button>
-    <button class="tab-btn active" data-tab="national" role="tab" aria-selected="true">National View</button>
-    <button class="tab-btn" data-tab="industry-space" role="tab" aria-selected="false">Industry Space</button>
+  <img src="rmi_logo_white.svg" alt="RMI">
+  <h1>Clean Growth Tool</h1>
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="national">National</button>
+    <button class="tab-btn" data-tab="regional">Regional</button>
+    <button class="tab-btn" data-tab="industry">Industry Space</button>
   </div>
 </div>
 
-<!-- ═══════════════ TAB 1: Regional ═══════════════ -->
-<div class="tab-panel" id="panel-regional">
-  <div class="sidebar" id="sidebar-regional">
-    <h3>Geography</h3>
-    <label for="reg-level">Level</label>
-    <select id="reg-level">
-      <option value="county" selected>County</option>
-      <option value="state">State</option>
-      <option value="cbsa">Metropolitan Statistical Area</option>
-      <option value="csa">Combined Statistical Area</option>
-      <option value="cz">Commuting Zone</option>
-    </select>
-    <label>Search Geography</label>
-    <div class="search-select-wrap" id="reg-geo-search"></div>
-  </div>
-  <div class="content" id="content-regional">
-    <div class="empty-state" id="reg-empty">
-      <h2>Select a Geography</h2>
-      <p>Choose a geography level and search for a specific region to view its economic complexity profile.</p>
-    </div>
-    <div id="reg-results" style="display:none"></div>
-  </div>
-</div>
-
-<!-- ═══════════════ TAB 2: National ═══════════════ -->
-<div class="tab-panel active" id="panel-national">
-  <div class="sidebar" id="sidebar-national">
-    <h3>Filters</h3>
-    <label for="nat-level">Geography Level</label>
+<!-- National -->
+<div class="panel active" id="p-national">
+  <div class="sidebar">
+    <label>Geography Level</label>
     <select id="nat-level">
-      <option value="county" selected>County</option>
+      <option value="county">County</option>
       <option value="state">State</option>
-      <option value="cbsa">Metropolitan Statistical Area</option>
+      <option value="cbsa">Metro Area (CBSA)</option>
       <option value="csa">Combined Statistical Area</option>
       <option value="cz">Commuting Zone</option>
     </select>
-    <div id="nat-state-filter-wrap" style="display:none">
-      <label for="nat-state-filter">Filter by State</label>
-      <select id="nat-state-filter">
-        <option value="">All States</option>
-      </select>
+    <div id="nat-state-wrap" style="display:none">
+      <label>Filter by State</label>
+      <select id="nat-state"><option value="">All States</option></select>
     </div>
-    <label for="nat-mode">Mode</label>
+    <label>Mode</label>
     <select id="nat-mode">
       <option value="industry">Industry Metrics</option>
       <option value="geography">Geography Metrics</option>
     </select>
-    <div id="nat-industry-wrap">
+    <div id="nat-ind-wrap">
       <label>Industry</label>
-      <div class="search-select-wrap" id="nat-ind-search"></div>
+      <div class="search-wrap" id="nat-ind-search"></div>
     </div>
-    <div id="nat-metric-wrap">
-      <label for="nat-metric">Metric</label>
+    <div id="nat-ind-metric-wrap">
+      <label>Metric</label>
       <select id="nat-metric">
+        <option value="industry_feasibility" selected>Industry Feasibility</option>
+        <option value="industry_feasibility_percentile_score">Feasibility Percentile</option>
         <option value="industry_present">Industry Presence</option>
         <option value="location_quotient">Location Quotient</option>
         <option value="industry_comparative_advantage">Comparative Advantage</option>
-        <option value="industry_feasibility" selected>Industry Feasibility</option>
-        <option value="industry_feasibility_percentile_score">Industry Feasibility Percentile</option>
         <option value="strategic_gain">Strategic Gain</option>
         <option value="strategic_gain_percentile_score">Strategic Gain Percentile</option>
         <option value="strategic_gain_possible">Strategic Gain Possible</option>
@@ -622,437 +276,198 @@ body {
       </select>
     </div>
     <div id="nat-geo-metric-wrap" style="display:none">
-      <label for="nat-geo-metric">Metric</label>
+      <label>Metric</label>
       <select id="nat-geo-metric">
         <option value="economic_complexity_index">Economic Complexity Index</option>
-        <option value="economic_complexity_percentile_score">Economic Complexity Index Percentile</option>
+        <option value="economic_complexity_percentile_score">ECI Percentile</option>
         <option value="industrial_diversity">Industrial Diversity</option>
         <option value="strategic_index">Strategic Index</option>
         <option value="strategic_index_percentile">Strategic Index Percentile</option>
       </select>
     </div>
-    <button class="btn" id="nat-load" style="margin-top:8px;">Load Data</button>
+    <button class="btn" id="nat-go">Load Data</button>
   </div>
-  <div class="content" id="content-national">
-    <div class="empty-state" id="nat-empty">
-      <h2>National Comparison</h2>
-      <p>Select a geography level, mode, and metric, then click "Load Data" to compare regions across the country.</p>
-    </div>
-    <div id="nat-results" style="display:none"></div>
+  <div class="content" id="nat-content">
+    <div class="empty"><h2>National Comparison</h2><p>Select filters and click Load Data.</p></div>
   </div>
 </div>
 
-<!-- ═══════════════ TAB 3: Industry Space ═══════════════ -->
-<div class="tab-panel" id="panel-industry-space">
-  <div class="sidebar" id="sidebar-industry-space">
-    <h3>Network Settings</h3>
-    <label for="is-level">Geography Level</label>
-    <select id="is-level">
-      <option value="county" selected>County</option>
+<!-- Regional -->
+<div class="panel" id="p-regional">
+  <div class="sidebar">
+    <label>Geography Level</label>
+    <select id="reg-level">
+      <option value="county">County</option>
       <option value="state">State</option>
-      <option value="cbsa">Metropolitan Statistical Area</option>
+      <option value="cbsa">Metro Area (CBSA)</option>
       <option value="csa">Combined Statistical Area</option>
       <option value="cz">Commuting Zone</option>
     </select>
-    <label for="is-threshold">Edge Proximity Threshold (top %)</label>
-    <input type="range" id="is-threshold" min="1" max="50" value="10">
-    <div class="range-label"><span>1%</span><span id="is-thresh-val">10%</span><span>50%</span></div>
-    <h3>Highlight Geography</h3>
-    <label>Search Geography (optional)</label>
-    <div class="search-select-wrap" id="is-geo-search"></div>
-    <button class="btn" id="is-load" style="margin-top:8px;">Render Network</button>
+    <label>Search Geography</label>
+    <div class="search-wrap" id="reg-geo-search"></div>
   </div>
-  <div class="content" id="content-industry-space">
-    <div class="empty-state" id="is-empty">
-      <h2>Industry Space Network</h2>
-      <p>Select a geography level and click "Render Network" to visualize the industry space.</p>
-    </div>
-    <div id="is-results" style="display:none"></div>
+  <div class="content" id="reg-content">
+    <div class="empty"><h2>Select a Geography</h2><p>Choose a level and search for a region to view its profile.</p></div>
   </div>
 </div>
 
-<!-- Footer -->
-<div class="site-footer">
-  <div class="footer-left">
-    <strong>Source:</strong> <a href="https://rmi.org" target="_blank" rel="noopener">RMI Clean Growth Tool</a>
+<!-- Industry Space -->
+<div class="panel" id="p-industry">
+  <div class="sidebar">
+    <label>Geography Level</label>
+    <select id="is-level">
+      <option value="county">County</option>
+      <option value="state">State</option>
+      <option value="cbsa">Metro Area (CBSA)</option>
+      <option value="csa">Combined Statistical Area</option>
+      <option value="cz">Commuting Zone</option>
+    </select>
+    <label>Highlight Geography (optional)</label>
+    <div class="search-wrap" id="is-geo-search"></div>
+    <button class="btn" id="is-go">Load Industry Data</button>
   </div>
-  <div class="footer-right">
-    <img src="rmi_logo_dark.svg" alt="RMI" height="28">
+  <div class="content" id="is-content">
+    <div class="empty"><h2>Industry Space</h2><p>Select a geography level and click Load Industry Data.</p></div>
   </div>
+</div>
+
+<div class="footer">
+  <span>Source: <a href="https://rmi.org" target="_blank">RMI</a> Clean Growth Tool</span>
+  <img src="rmi_logo_dark.svg" alt="RMI" height="24">
 </div>
 
 <script>
-// ════════════════════════════════════════════
-//  GLOBALS & CACHE
-// ════════════════════════════════════════════
+// ═══════════════════════════════════════
+//  CONFIG & STATE
+// ═══════════════════════════════════════
 const BASE = (() => {
-  const s = document.baseURI || window.location.href;
+  const s = document.baseURI || location.href;
   return s.substring(0, s.lastIndexOf('/') + 1);
 })();
 
 const CACHE = new Map();
-const LEVEL_MAP = { county: 1, state: 2, cbsa: 3, csa: 4, cz: 5 };
-const LEVEL_LABEL = { county:'County', state:'State', cbsa:'Metropolitan Statistical Area', csa:'Combined Statistical Area', cz:'Commuting Zone' };
+const LEVELS = { county: 1, state: 2, cbsa: 3, csa: 4, cz: 5 };
+const LEVEL_NAME = { county:'County', state:'State', cbsa:'Metro Area', csa:'CSA', cz:'Commuting Zone' };
 
-let metaGeo = null;        // rows from geography_specific
-let metaIndustry = null;   // rows from industry_specific
-let industryTitles = null; // Map code->desc
-let crosswalk = null;
+let metaGeo = null, crosswalk = null, industryTitles = null, metaIndustry = null;
+let stateFipsToAbbr = null, countyToParent = null, stateList = null;
 
-// Map infrastructure
-let countyGeoJSON = null;        // GeoJSON FeatureCollection for US counties
-let countyTopoJSON = null;       // TopoJSON topology (smaller, used for state mesh extraction)
-let stateFipsToAbbr = null;      // Map: "01" -> "AL"
-let countyToParent = null;       // Map: countyGeoid -> { cbsa: {geoid,name}, csa: {geoid,name}, cz: {geoid,name} }
-const COUNTY_TOPO_URL = 'us-counties-2023-topo.json';
-const COUNTY_GEOJSON_URL = 'us-counties-2023.json'; // legacy fallback
-
-// Responsive chart height: smaller on mobile
-function chartH(desktopH) {
-  return (window._isMobile && window._isMobile()) ? Math.round(desktopH * 0.6) : desktopH;
-}
-
-const CB_PAIRED = ['#a6cee3','#1f78b4','#b2df8a','#33a02c','#fb9a99','#e31a1c','#fdbf6f','#ff7f00','#cab2d6'];
-
-// Build a continuous D3 color scale with quantile-based breaks
-// Uses equal-count (quantile) bins so every color appears on the map
-function buildContinuousColor(allVals, metricKey) {
-  const binaryMetrics = ['industry_present', 'industry_comparative_advantage', 'strategic_gain_possible'];
-  if (binaryMetrics.includes(metricKey)) {
-    return { scale: v => v >= 1 ? '#2c7bb6' : '#e8e8e8', breaks: [0, 1], isBinary: true };
-  }
-  const sorted = allVals.slice().sort((a, b) => a - b);
-  if (sorted.length === 0) {
-    return { scale: () => '#7fcdbb', breaks: [0, 1], isBinary: false };
-  }
-  const lo = sorted[0], hi = sorted[sorted.length - 1];
-  if (lo === hi) {
-    return { scale: () => '#7fcdbb', breaks: [lo, hi], isBinary: false };
-  }
-  // Build quantile breaks: 7 bins with equal numbers of observations
-  const nBreaks = 7;
-  const breaks = [];
-  for (let i = 0; i <= nBreaks; i++) {
-    const idx = Math.min(sorted.length - 1, Math.round(sorted.length * i / nBreaks));
-    breaks.push(sorted[idx]);
-  }
-  // Quantile scale: maps value → [0, 1] based on rank, then interpolates color
-  const scale = v => {
-    if (v <= breaks[0]) return d3.interpolateYlGnBu(0);
-    if (v >= breaks[nBreaks]) return d3.interpolateYlGnBu(1);
-    for (let i = 0; i < nBreaks; i++) {
-      if (v <= breaks[i + 1]) {
-        // Interpolate within this bin
-        const binLo = breaks[i], binHi = breaks[i + 1];
-        const t = binHi === binLo ? 0.5 : (v - binLo) / (binHi - binLo);
-        const colorLo = i / nBreaks;
-        const colorHi = (i + 1) / nBreaks;
-        return d3.interpolateYlGnBu(colorLo + t * (colorHi - colorLo));
-      }
-    }
-    return d3.interpolateYlGnBu(1);
-  };
-  return { scale, breaks, isBinary: false };
-}
-
-// ── RMI logo overlay for Plotly layouts ──
-function rmiLogoImages() {
-  return [{
-    source: 'rmi_logo_dark.svg',
-    xref: 'paper', yref: 'paper',
-    x: 1, y: 0,
-    xanchor: 'right', yanchor: 'bottom',
-    sizex: 0.12, sizey: 0.08,
-    opacity: 0.35,
-    layer: 'above'
-  }];
-}
-
-// ── Multi-format export buttons ──
-function buildExportBar(plotEl, filename, getDataFn) {
-  const bar = document.createElement('div');
-  bar.className = 'export-bar';
-  bar.innerHTML = '<span>Export:</span>';
-
-  ['png', 'svg', 'pdf'].forEach(fmt => {
-    const btn = document.createElement('button');
-    btn.textContent = fmt.toUpperCase();
-    btn.addEventListener('click', () => {
-      Plotly.downloadImage(plotEl, { format: fmt, width: 1200, height: 800, filename: filename });
-    });
-    bar.appendChild(btn);
-  });
-
-  if (getDataFn) {
-    const csvBtn = document.createElement('button');
-    csvBtn.textContent = 'CSV';
-    csvBtn.addEventListener('click', () => {
-      const { rows, columns } = getDataFn();
-      if (!rows || !rows.length) return;
-      const header = columns.map(c => c.label || c.key).join(',');
-      const body = rows.map(r => columns.map(c => {
-        const v = r[c.key];
-        return typeof v === 'string' && v.includes(',') ? '"' + v + '"' : (v == null ? '' : v);
-      }).join(',')).join('\n');
-      const blob = new Blob([header + '\n' + body], { type: 'text/csv' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = filename + '.csv';
-      a.click();
-      URL.revokeObjectURL(a.href);
-    });
-    bar.appendChild(csvBtn);
-  }
-
-  return bar;
-}
-
-// ════════════════════════════════════════════
+// ═══════════════════════════════════════
 //  UTILITIES
-// ════════════════════════════════════════════
-function showSpinner(msg) {
-  document.getElementById('spinner').classList.add('visible');
-  if (msg) setLoadStatus(msg);
-  // Disable all action buttons while loading
-  document.querySelectorAll('.btn').forEach(b => b.classList.add('loading'));
-}
-function hideSpinner() {
-  document.getElementById('spinner').classList.remove('visible');
-  setLoadStatus('');
-  setLoadProgress(-1);
-  document.querySelectorAll('.btn').forEach(b => b.classList.remove('loading'));
-}
-function setLoadStatus(msg) {
-  const el = document.getElementById('load-status');
-  if (el) el.textContent = msg || '';
-}
-function setLoadProgress(pct) {
-  const wrap = document.getElementById('load-bar-wrap');
-  const bar = document.getElementById('load-bar');
-  if (!wrap || !bar) return;
-  if (pct < 0) { wrap.style.display = 'none'; bar.style.width = '0%'; return; }
-  wrap.style.display = 'block';
-  bar.style.width = Math.min(100, Math.round(pct)) + '%';
+// ═══════════════════════════════════════
+function show(id) { document.getElementById(id).classList.add('visible'); }
+function hide(id) { document.getElementById(id).classList.remove('visible'); }
+function spin(msg) { document.getElementById('spin-msg').textContent = msg || 'Loading...'; show('spinner'); }
+function unspin() { hide('spinner'); }
+
+function fmt(v, d) { return v == null || isNaN(v) ? '\u2014' : Number(v).toFixed(d == null ? 2 : d); }
+function fmtPct(v) { return v == null ? '\u2014' : fmt(v, 1) + '%'; }
+function fmtInt(v) { return v == null ? '\u2014' : Math.round(v).toLocaleString(); }
+
+function padGeoid(id, level) {
+  if (level === 'county') return String(id).padStart(5, '0');
+  if (level === 'state') return String(id).padStart(2, '0');
+  return String(id);
 }
 
-async function fetchCSV(relPath) {
-  if (CACHE.has(relPath)) return CACHE.get(relPath);
-  const url = BASE + relPath;
-  const resp = await fetch(url);
-  if (!resp.ok) throw new Error('Failed to fetch ' + url + ' (' + resp.status + ')');
-  const text = await resp.text();
-  const parsed = Papa.parse(text.trim(), { header: true, skipEmptyLines: true, dynamicTyping: true });
-  CACHE.set(relPath, parsed.data);
-  return parsed.data;
+async function fetchCSV(path) {
+  if (CACHE.has(path)) return CACHE.get(path);
+  const r = await fetch(BASE + path);
+  if (!r.ok) throw new Error('Failed: ' + path + ' (' + r.status + ')');
+  const t = await r.text();
+  const d = Papa.parse(t.trim(), { header: true, skipEmptyLines: true, dynamicTyping: true }).data;
+  CACHE.set(path, d);
+  return d;
 }
 
-async function fetchCSVGz(relPath) {
-  if (CACHE.has(relPath)) return CACHE.get(relPath);
-  const url = BASE + relPath;
-  const resp = await fetch(url);
-  if (!resp.ok) throw new Error('Failed to fetch ' + url + ' (' + resp.status + ')');
-  const buf = await resp.arrayBuffer();
-  const decompressed = pako.inflate(new Uint8Array(buf), { to: 'string' });
-  const parsed = Papa.parse(decompressed.trim(), { header: true, skipEmptyLines: true, dynamicTyping: true });
-  CACHE.set(relPath, parsed.data);
-  return parsed.data;
+async function fetchGz(path) {
+  if (CACHE.has(path)) return CACHE.get(path);
+  const r = await fetch(BASE + path);
+  if (!r.ok) throw new Error('Failed: ' + path + ' (' + r.status + ')');
+  const buf = await r.arrayBuffer();
+  const t = pako.inflate(new Uint8Array(buf), { to: 'string' });
+  const d = Papa.parse(t.trim(), { header: true, skipEmptyLines: true, dynamicTyping: true }).data;
+  CACHE.set(path, d);
+  return d;
 }
 
-function fmt(v, decimals) {
-  if (v == null || isNaN(v)) return '—';
-  if (decimals === undefined) decimals = 2;
-  return Number(v).toFixed(decimals);
-}
-function fmtPct(v) { return v == null || isNaN(v) ? '—' : Number(v).toFixed(1) + '%'; }
-function fmtInt(v) { return v == null || isNaN(v) ? '—' : Math.round(v).toLocaleString(); }
-
-async function fetchGeoJSON() {
-  if (countyGeoJSON) return countyGeoJSON;
-  performance.mark('geojson-start');
-  // Prefer TopoJSON (1.4MB) over GeoJSON (3.3MB) — ~60% smaller
-  try {
-    const resp = await fetch(BASE + COUNTY_TOPO_URL);
-    if (resp.ok) {
-      countyTopoJSON = await resp.json();
-      const raw = topojson.feature(countyTopoJSON, countyTopoJSON.objects.counties);
-      // Filter to continental US + DC (FIPS ≤ 56)
-      raw.features = raw.features.filter(f => {
-        const fips = parseInt(String(f.id).substring(0, 2), 10);
-        return fips <= 56;
-      });
-      countyGeoJSON = raw;
-      performance.mark('geojson-end');
-      performance.measure('TopoJSON load + convert', 'geojson-start', 'geojson-end');
-      return countyGeoJSON;
-    }
-  } catch (e) { console.warn('TopoJSON load failed, falling back to GeoJSON:', e); }
-  // Fallback to legacy GeoJSON
-  const resp = await fetch(BASE + COUNTY_GEOJSON_URL);
-  if (!resp.ok) throw new Error('Failed to fetch county GeoJSON');
-  countyGeoJSON = await resp.json();
-  performance.mark('geojson-end');
-  performance.measure('GeoJSON load (fallback)', 'geojson-start', 'geojson-end');
-  return countyGeoJSON;
-}
-
-let stateList = null; // [{fips, abbr, name}] sorted by name
-
-function buildCrosswalkMaps() {
-  if (!crosswalk || stateFipsToAbbr) return;
-  stateFipsToAbbr = new Map();
-  countyToParent = new Map();
-  const stateSet = new Map();
-  crosswalk.forEach(r => {
-    const sf = String(r.state_fips).padStart(2, '0');
-    if (r.state_abbreviation) {
-      stateFipsToAbbr.set(sf, r.state_abbreviation);
-      if (!stateSet.has(sf)) stateSet.set(sf, { fips: sf, abbr: r.state_abbreviation, name: r.state_name || r.state_abbreviation });
-    }
-    const countyId = String(r.county_geoid).padStart(5, '0');
-    countyToParent.set(countyId, {
-      cbsa: r.county_in_cbsa === true || r.county_in_cbsa === 'True' ? { geoid: String(r.cbsa_geoid), name: r.cbsa_name } : null,
-      csa: r.county_in_csa === true || r.county_in_csa === 'True' ? { geoid: String(r.csa_geoid), name: r.csa_name } : null,
-      cz: { geoid: String(r.commuting_zone_geoid), name: r.commuting_zone_name },
-      state_fips: sf,
-      state_abbr: r.state_abbreviation,
-      state_name: r.state_name || r.state_abbreviation,
-      county_name: r.county_name
-    });
-  });
-  stateList = Array.from(stateSet.values()).sort((a, b) => a.name.localeCompare(b.name));
-}
-
-function getCountyDisplayName(countyFips) {
-  const parent = countyToParent ? countyToParent.get(countyFips) : null;
-  if (parent) return (parent.county_name || countyFips) + ', ' + (parent.state_abbr || '');
-  return countyFips;
-}
-
-function getCountyStateFips(countyFips) {
-  const parent = countyToParent ? countyToParent.get(countyFips) : null;
-  return parent ? parent.state_fips : null;
-}
-
-function padGeoid(geoid, level) {
-  if (level === 'state') return String(geoid).padStart(2, '0');
-  if (level === 'county') return String(geoid).padStart(5, '0');
-  return String(geoid);
-}
-
-// ════════════════════════════════════════════
-//  SEARCH-SELECT WIDGET
-// ════════════════════════════════════════════
-function createSearchSelect(containerEl, items, placeholder, onSelect) {
-  // items = [{value, label}]
-  containerEl.innerHTML = '';
-  const input = document.createElement('input');
-  input.type = 'text';
-  input.placeholder = placeholder || 'Type to search...';
+// ═══════════════════════════════════════
+//  SEARCH SELECT WIDGET
+// ═══════════════════════════════════════
+function searchSelect(container, items, placeholder, onPick) {
+  container.innerHTML = '';
+  const inp = document.createElement('input');
+  inp.type = 'text';
+  inp.placeholder = placeholder || 'Type to search...';
   const list = document.createElement('div');
-  list.className = 'search-select-list';
-  containerEl.appendChild(input);
-  containerEl.appendChild(list);
+  list.className = 'search-list';
+  container.appendChild(inp);
+  container.appendChild(list);
 
-  let selectedValue = null;
-  let highlightIdx = -1;
-  let filteredItems = [];
+  let selected = null;
 
-  function render(filter) {
-    const q = (filter || '').toLowerCase();
-    filteredItems = q ? items.filter(it => it.label.toLowerCase().includes(q)).slice(0, 200) : items.slice(0, 200);
-    highlightIdx = -1;
-    list.innerHTML = '';
-    filteredItems.forEach((it, i) => {
-      const div = document.createElement('div');
-      div.className = 'search-select-item' + (it.value === selectedValue ? ' selected' : '');
-      div.textContent = it.label;
-      div.addEventListener('mousedown', e => { e.preventDefault(); pick(it, i); });
-      list.appendChild(div);
-    });
+  function render(q) {
+    q = (q || '').toLowerCase();
+    const f = q ? items.filter(i => i.label.toLowerCase().includes(q)).slice(0, 150) : items.slice(0, 150);
+    list.innerHTML = f.map(i => '<div class="search-item" data-v="' + i.value + '">' + escHtml(i.label) + '</div>').join('');
     list.classList.add('open');
+    list.querySelectorAll('.search-item').forEach(el => {
+      el.addEventListener('mousedown', e => {
+        e.preventDefault();
+        selected = el.dataset.v;
+        inp.value = el.textContent;
+        list.classList.remove('open');
+        if (onPick) onPick(selected);
+      });
+    });
   }
 
-  function pick(it) {
-    selectedValue = it.value;
-    input.value = it.label;
-    list.classList.remove('open');
-    if (onSelect) onSelect(it.value, it.label);
-  }
+  inp.addEventListener('focus', () => render(inp.value));
+  inp.addEventListener('input', () => render(inp.value));
+  inp.addEventListener('blur', () => setTimeout(() => list.classList.remove('open'), 150));
 
-  input.addEventListener('focus', () => render(input.value));
-  input.addEventListener('input', () => render(input.value));
-  input.addEventListener('blur', () => { setTimeout(() => list.classList.remove('open'), 150); });
-  input.addEventListener('keydown', e => {
-    const children = list.children;
-    if (e.key === 'ArrowDown') { e.preventDefault(); highlightIdx = Math.min(highlightIdx + 1, children.length - 1); updateHighlight(children); }
-    else if (e.key === 'ArrowUp') { e.preventDefault(); highlightIdx = Math.max(highlightIdx - 1, 0); updateHighlight(children); }
-    else if (e.key === 'Enter' && highlightIdx >= 0 && filteredItems[highlightIdx]) { e.preventDefault(); pick(filteredItems[highlightIdx]); }
-    else if (e.key === 'Escape') { list.classList.remove('open'); input.blur(); }
-  });
-
-  function updateHighlight(children) {
-    Array.from(children).forEach((c, i) => c.classList.toggle('highlighted', i === highlightIdx));
-    if (children[highlightIdx]) children[highlightIdx].scrollIntoView({ block: 'nearest' });
-  }
-
-  return { getValue: () => selectedValue, setValue: (v, l) => { selectedValue = v; input.value = l || ''; }, clear: () => { selectedValue = null; input.value = ''; } };
+  return {
+    val: () => selected,
+    set: (v, label) => { selected = v; inp.value = label || ''; },
+    clear: () => { selected = null; inp.value = ''; }
+  };
 }
 
-// ════════════════════════════════════════════
+function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+// ═══════════════════════════════════════
 //  SORTABLE TABLE
-// ════════════════════════════════════════════
-function renderSortableTable(containerEl, columns, rows, defaultSortCol, defaultSortDir) {
-  // columns = [{key, label, fmt?, align?}]
-  // rows = array of objects
-  containerEl.innerHTML = '';
-  if (!rows || rows.length === 0) { containerEl.innerHTML = '<div class="no-data">No data to display.</div>'; return; }
-
-  let sortCol = defaultSortCol || columns[0].key;
-  let sortDir = defaultSortDir || 'desc';
-
-  const info = document.createElement('div');
-  info.className = 'table-info';
-  containerEl.appendChild(info);
-
-  const wrap = document.createElement('div');
-  wrap.className = 'table-wrap';
-  wrap.style.maxHeight = '500px';
-  wrap.style.overflowY = 'auto';
-  containerEl.appendChild(wrap);
+// ═══════════════════════════════════════
+function makeTable(el, cols, rows, sortKey, sortDir) {
+  if (!rows.length) { el.innerHTML = '<div style="padding:20px;text-align:center;color:#999;">No data.</div>'; return; }
+  let sk = sortKey || cols[0].key, sd = sortDir || 'desc';
 
   function draw() {
     const sorted = [...rows].sort((a, b) => {
-      let av = a[sortCol], bv = b[sortCol];
+      let av = a[sk], bv = b[sk];
       if (av == null) return 1; if (bv == null) return -1;
-      if (typeof av === 'string') return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
-      return sortDir === 'asc' ? av - bv : bv - av;
+      if (typeof av === 'string') return sd === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+      return sd === 'asc' ? av - bv : bv - av;
     });
-    info.textContent = rows.length + ' rows \u2014 sorted by ' + columns.find(c => c.key === sortCol).label + ' (' + sortDir + ')';
-
-    let html = '<table><thead><tr>';
-    columns.forEach(c => {
-      const arrow = c.key === sortCol ? (sortDir === 'asc' ? ' \u25B2' : ' \u25BC') : ' \u25B4';
-      const cls = c.key === sortCol ? ' class="sorted"' : '';
-      html += '<th' + cls + ' data-key="' + c.key + '">' + c.label + '<span class="sort-arrow">' + arrow + '</span></th>';
-    });
-    html += '</tr></thead><tbody>';
-    sorted.forEach(r => {
-      html += '<tr>';
-      columns.forEach(c => {
+    let h = '<div class="tbl-wrap"><table><thead><tr>';
+    cols.forEach(c => { h += '<th data-k="' + c.key + '">' + c.label + '</th>'; });
+    h += '</tr></thead><tbody>';
+    sorted.slice(0, 500).forEach(r => {
+      h += '<tr>';
+      cols.forEach(c => {
         const v = r[c.key];
-        const display = c.fmt ? c.fmt(v) : (v == null ? '—' : v);
-        html += '<td style="text-align:' + (c.align || 'left') + '">' + display + '</td>';
+        h += '<td style="text-align:' + (c.align || 'left') + '">' + (c.fmt ? c.fmt(v) : (v == null ? '\u2014' : v)) + '</td>';
       });
-      html += '</tr>';
+      h += '</tr>';
     });
-    html += '</tbody></table>';
-    wrap.innerHTML = html;
-
-    wrap.querySelectorAll('th').forEach(th => {
+    h += '</tbody></table></div>';
+    if (rows.length > 500) h += '<div style="font-size:12px;color:#999;margin-top:-16px;margin-bottom:16px;">Showing 500 of ' + rows.length + ' rows</div>';
+    el.innerHTML = h;
+    el.querySelectorAll('th').forEach(th => {
       th.addEventListener('click', () => {
-        const key = th.dataset.key;
-        if (sortCol === key) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
-        else { sortCol = key; sortDir = 'desc'; }
+        const k = th.dataset.k;
+        if (sk === k) sd = sd === 'asc' ? 'desc' : 'asc';
+        else { sk = k; sd = 'desc'; }
         draw();
       });
     });
@@ -1060,1789 +475,593 @@ function renderSortableTable(containerEl, columns, rows, defaultSortCol, default
   draw();
 }
 
-// ════════════════════════════════════════════
-//  LOAD META DATA
-// ════════════════════════════════════════════
-async function ensureMeta() {
-  if (!metaGeo) metaGeo = await fetchCSV('meta/geography_specific.csv');
-  if (!industryTitles) {
-    const rows = await fetchCSV('meta/industry_titles.csv');
-    industryTitles = new Map();
-    rows.forEach(r => industryTitles.set(String(r.industry_code), r.industry_description));
-  }
-  if (!crosswalk) crosswalk = await fetchCSV('meta/crosswalk.csv');
-  buildCrosswalkMaps();
+// ═══════════════════════════════════════
+//  METADATA
+// ═══════════════════════════════════════
+async function loadMeta() {
+  metaGeo = await fetchCSV('meta/geography_specific.csv');
+  const indRows = await fetchCSV('meta/industry_titles.csv');
+  industryTitles = new Map();
+  indRows.forEach(r => industryTitles.set(String(r.industry_code), r.industry_description));
+  crosswalk = await fetchCSV('meta/crosswalk.csv');
+  buildMaps();
 }
 
-async function ensureIndustryMeta() {
-  if (!metaIndustry) metaIndustry = await fetchCSV('meta/industry_specific.csv');
+function buildMaps() {
+  stateFipsToAbbr = new Map();
+  countyToParent = new Map();
+  const ss = new Map();
+  crosswalk.forEach(r => {
+    const sf = String(r.state_fips).padStart(2, '0');
+    if (r.state_abbreviation) {
+      stateFipsToAbbr.set(sf, r.state_abbreviation);
+      if (!ss.has(sf)) ss.set(sf, { fips: sf, abbr: r.state_abbreviation, name: r.state_name || r.state_abbreviation });
+    }
+    const cid = String(r.county_geoid).padStart(5, '0');
+    countyToParent.set(cid, {
+      cbsa: r.county_in_cbsa === true || r.county_in_cbsa === 'True' ? { geoid: String(r.cbsa_geoid), name: r.cbsa_name } : null,
+      csa: r.county_in_csa === true || r.county_in_csa === 'True' ? { geoid: String(r.csa_geoid), name: r.csa_name } : null,
+      cz: { geoid: String(r.commuting_zone_geoid), name: r.commuting_zone_name },
+      state_fips: sf,
+      state_abbr: r.state_abbreviation,
+      county_name: r.county_name
+    });
+  });
+  stateList = Array.from(ss.values()).sort((a, b) => a.name.localeCompare(b.name));
 }
 
-function getGeosByLevel(levelName) {
-  const code = LEVEL_MAP[levelName];
-  return metaGeo.filter(r => r.geo_aggregation_level === code);
+function countyName(fips) {
+  const p = countyToParent ? countyToParent.get(fips) : null;
+  return p ? (p.county_name || fips) + ', ' + (p.state_abbr || '') : fips;
 }
 
-function getGeoName(geoid, levelName) {
-  const code = LEVEL_MAP[levelName];
-  const r = metaGeo.find(g => g.geo_aggregation_level === code && String(g.geoid) === String(geoid));
-  return r ? r.name : String(geoid);
+function geosByLevel(level) {
+  return metaGeo.filter(r => r.geo_aggregation_level === LEVELS[level]);
 }
 
-function getGeoRecord(geoid, levelName) {
-  const code = LEVEL_MAP[levelName];
-  return metaGeo.find(g => g.geo_aggregation_level === code && String(g.geoid) === String(geoid));
+function geoItems(level) {
+  return geosByLevel(level).map(g => {
+    let label = g.name;
+    if (level === 'county') label = countyName(String(g.geoid).padStart(5, '0'));
+    return { value: String(g.geoid), label };
+  }).sort((a, b) => a.label.localeCompare(b.label));
 }
 
-// ════════════════════════════════════════════
+// ═══════════════════════════════════════
 //  TAB SWITCHING
-// ════════════════════════════════════════════
+// ═══════════════════════════════════════
 document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('.tab-btn').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-selected', 'false'); });
-    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
     btn.classList.add('active');
-    btn.setAttribute('aria-selected', 'true');
-    const panel = document.getElementById('panel-' + btn.dataset.tab);
-    panel.classList.add('active');
-    // Resize any Plotly charts in the newly visible panel
-    setTimeout(() => {
-      panel.querySelectorAll('.js-plotly-plot').forEach(el => Plotly.Plots.resize(el));
-    }, 100);
+    document.getElementById('p-' + btn.dataset.tab).classList.add('active');
   });
 });
 
-// ════════════════════════════════════════════
-//  MOBILE: hamburger menu + sidebar collapse
-// ════════════════════════════════════════════
-(function initMobile() {
-  const menuBtn = document.getElementById('mobile-menu-btn');
-  const tabBar  = document.getElementById('tab-bar');
-
-  // Hamburger toggle
-  if (menuBtn && tabBar) {
-    menuBtn.addEventListener('click', () => {
-      tabBar.classList.toggle('open');
-    });
-    // Close menu when a tab is clicked
-    tabBar.querySelectorAll('.tab-btn').forEach(btn => {
-      btn.addEventListener('click', () => tabBar.classList.remove('open'));
-    });
-  }
-
-  // Sidebar collapse toggles
-  document.querySelectorAll('.sidebar').forEach(sidebar => {
-    const toggle = document.createElement('button');
-    toggle.className = 'sidebar-toggle';
-    toggle.textContent = 'Show Filters';
-    toggle.addEventListener('click', () => {
-      sidebar.classList.toggle('collapsed');
-      toggle.textContent = sidebar.classList.contains('collapsed') ? 'Show Filters' : 'Hide Filters';
-    });
-    sidebar.insertBefore(toggle, sidebar.firstChild);
-    // Start collapsed on mobile
-    if (window.innerWidth <= 600) {
-      sidebar.classList.add('collapsed');
-    }
-  });
-
-  // Helper to detect mobile
-  function isMobile() { return window.innerWidth <= 600; }
-
-  // Expose for map renderers
-  window._isMobile = isMobile;
-})();
-
-// ════════════════════════════════════════════
-//  TAB 1: REGIONAL VIEW
-// ════════════════════════════════════════════
-let regGeoWidget = null;
-let regSelectedGeo = null;
-
-async function initRegional() {
-  showSpinner();
-  await ensureMeta();
-  await ensureIndustryMeta();
-  populateRegGeoList();
-  hideSpinner();
-}
-
-function populateRegGeoList() {
-  const level = document.getElementById('reg-level').value;
-  const geos = getGeosByLevel(level);
-  const items = geos.map(g => {
-    let label = g.name;
-    if (level === 'county') {
-      const fips = String(g.geoid).padStart(5, '0');
-      label = getCountyDisplayName(fips);
-    }
-    return { value: String(g.geoid), label: label };
-  }).sort((a, b) => a.label.localeCompare(b.label));
-  regGeoWidget = createSearchSelect(
-    document.getElementById('reg-geo-search'), items,
-    'Search ' + LEVEL_LABEL[level] + '...',
-    (val) => { regSelectedGeo = val; loadRegional(level, val); }
-  );
-}
-
-document.getElementById('reg-level').addEventListener('change', () => {
-  populateRegGeoList();
-  document.getElementById('reg-results').style.display = 'none';
-  document.getElementById('reg-empty').style.display = '';
-});
-
-async function loadRegional(level, geoid) {
-  showSpinner('Loading regional data...');
-  try {
-    const data = await fetchCSVGz('by_geography/' + level + '/' + padGeoid(geoid, level) + '.csv.gz');
-    const geoRec = getGeoRecord(geoid, level);
-    const levelCode = LEVEL_MAP[level];
-    const indMeta = metaIndustry.filter(r => r.geo_aggregation_level === levelCode);
-    const indMetaMap = new Map();
-    indMeta.forEach(r => indMetaMap.set(String(r.industry_code), r));
-
-    // Build display
-    const container = document.getElementById('reg-results');
-    container.innerHTML = '';
-    container.style.display = '';
-    document.getElementById('reg-empty').style.display = 'none';
-
-    // Title
-    const title = document.createElement('h2');
-    title.style.cssText = 'color:var(--blue-spruce);margin-bottom:16px;font-size:24px;';
-    if (level === 'county' && geoRec) {
-      title.textContent = getCountyDisplayName(String(geoRec.geoid).padStart(5, '0'));
-    } else {
-      title.textContent = geoRec ? geoRec.name : geoid;
-    }
-    container.appendChild(title);
-
-    // Locator mini-map
-    const locatorDiv = document.createElement('div');
-    const locW = (window._isMobile && window._isMobile()) ? '100%' : '280px';
-    locatorDiv.style.cssText = 'float:right;margin:0 0 16px 16px;width:' + locW + ';max-width:100%;';
-    const locatorMap = document.createElement('div');
-    locatorMap.id = 'reg-locator-map';
-    locatorDiv.appendChild(locatorMap);
-    container.appendChild(locatorDiv);
-    renderLocatorMap(locatorMap, level, padGeoid(geoid, level));
-
-    // Summary cards
-    if (geoRec) {
-      const cardsDiv = document.createElement('div');
-      cardsDiv.className = 'cards';
-      cardsDiv.innerHTML =
-        '<div class="card"><div class="card-label">Economic Complexity Index</div><div class="card-value">' + fmt(geoRec.economic_complexity_index) + '</div><div class="card-sub">' + fmtPct(geoRec.economic_complexity_percentile_score) + ' percentile</div></div>' +
-        '<div class="card"><div class="card-label">Industrial Diversity</div><div class="card-value">' + fmtInt(geoRec.industrial_diversity) + '</div><div class="card-sub">unique industries</div></div>' +
-        '<div class="card"><div class="card-label">Strategic Index</div><div class="card-value">' + fmt(geoRec.strategic_index) + '</div><div class="card-sub">' + fmtPct(geoRec.strategic_index_percentile) + ' percentile</div></div>';
-      container.appendChild(cardsDiv);
-    }
-
-    // Enrich data
-    const enriched = data.map(r => {
-      const im = indMetaMap.get(String(r.industry_code));
-      return {
-        ...r,
-        industry_description: industryTitles.get(String(r.industry_code)) || String(r.industry_code),
-        industry_complexity: im ? im.industry_complexity : null,
-        industry_complexity_percentile: im ? im.industry_complexity_percentile : null
-      };
-    });
-
-    // Current Strengths
-    const strengths = enriched.filter(r => r.industry_comparative_advantage === 1).sort((a, b) => (b.location_quotient || 0) - (a.location_quotient || 0));
-    const t1 = document.createElement('div');
-    const h1 = document.createElement('div'); h1.className = 'section-title'; h1.textContent = 'Current Strengths (Comparative Advantage)'; t1.appendChild(h1);
-    const tw1 = document.createElement('div'); t1.appendChild(tw1);
-    renderSortableTable(tw1, [
-      { key: 'industry_description', label: 'Industry' },
-      { key: 'industry_code', label: 'Industry Code', align: 'center' },
-      { key: 'location_quotient', label: 'Location Quotient', align: 'right', fmt: v => fmt(v, 3) },
-      { key: 'industry_employment_share', label: 'Employment Share', align: 'right', fmt: v => v != null ? (v * 100).toFixed(3) + '%' : '—' },
-      { key: 'industry_complexity', label: 'Industry Complexity', align: 'right', fmt: v => fmt(v) },
-      { key: 'industry_feasibility_percentile_score', label: 'Feasibility Percentile', align: 'right', fmt: v => fmt(v, 1) }
-    ], strengths, 'location_quotient', 'desc');
-    container.appendChild(t1);
-
-    // Growth Opportunities
-    const growth = enriched.filter(r => r.industry_comparative_advantage === 0 && r.industry_feasibility_percentile_score >= 75).sort((a, b) => (b.industry_feasibility || 0) - (a.industry_feasibility || 0));
-    const t2 = document.createElement('div');
-    const h2 = document.createElement('div'); h2.className = 'section-title'; h2.textContent = 'Growth Opportunities (No Comparative Advantage, Feasibility \u2265 75th Percentile)'; t2.appendChild(h2);
-    const tw2 = document.createElement('div'); t2.appendChild(tw2);
-    renderSortableTable(tw2, [
-      { key: 'industry_description', label: 'Industry' },
-      { key: 'industry_code', label: 'Industry Code', align: 'center' },
-      { key: 'industry_feasibility', label: 'Feasibility', align: 'right', fmt: v => fmt(v, 4) },
-      { key: 'industry_feasibility_percentile_score', label: 'Feasibility Percentile', align: 'right', fmt: v => fmt(v, 1) },
-      { key: 'industry_complexity', label: 'Industry Complexity', align: 'right', fmt: v => fmt(v) },
-      { key: 'industry_complexity_percentile', label: 'Complexity Percentile', align: 'right', fmt: v => fmt(v, 1) }
-    ], growth, 'industry_feasibility', 'desc');
-    container.appendChild(t2);
-
-    // Strategic Targets
-    const strategic = enriched.filter(r => r.strategic_gain_possible === 1).sort((a, b) => (b.strategic_gain_percentile_score || 0) - (a.strategic_gain_percentile_score || 0));
-    const t3 = document.createElement('div');
-    const h3 = document.createElement('div'); h3.className = 'section-title'; h3.textContent = 'Strategic Targets'; t3.appendChild(h3);
-    const tw3 = document.createElement('div'); t3.appendChild(tw3);
-    renderSortableTable(tw3, [
-      { key: 'industry_description', label: 'Industry' },
-      { key: 'industry_code', label: 'Industry Code', align: 'center' },
-      { key: 'strategic_gain', label: 'Strategic Gain', align: 'right', fmt: v => fmt(v, 4) },
-      { key: 'strategic_gain_percentile_score', label: 'Strategic Gain Percentile', align: 'right', fmt: v => fmt(v, 1) },
-      { key: 'industry_feasibility', label: 'Feasibility', align: 'right', fmt: v => fmt(v, 4) },
-      { key: 'industry_complexity', label: 'Industry Complexity', align: 'right', fmt: v => fmt(v) }
-    ], strategic, 'strategic_gain_percentile_score', 'desc');
-    container.appendChild(t3);
-
-    // Scatter plot
-    const chartTitle = document.createElement('div');
-    chartTitle.className = 'section-title';
-    chartTitle.textContent = 'Industry Feasibility vs. Complexity';
-    container.appendChild(chartTitle);
-
-    const chartDiv = document.createElement('div');
-    chartDiv.className = 'chart-container';
-    const plotEl = document.createElement('div');
-    plotEl.id = 'reg-scatter';
-    chartDiv.appendChild(plotEl);
-    container.appendChild(chartDiv);
-
-    const rcaYes = enriched.filter(r => r.industry_comparative_advantage === 1 && r.industry_complexity != null);
-    const rcaNo = enriched.filter(r => r.industry_comparative_advantage === 0 && r.industry_complexity != null);
-
-    const traceRCA = {
-      x: rcaYes.map(r => r.industry_feasibility),
-      y: rcaYes.map(r => r.industry_complexity),
-      text: rcaYes.map(r => r.industry_description + '<br>Industry Code: ' + r.industry_code + '<br>Location Quotient: ' + fmt(r.location_quotient, 2)),
-      mode: 'markers',
-      type: 'scatter',
-      name: 'Comparative Advantage (Current Strength)',
-      marker: { color: CB_PAIRED[1], size: 7, opacity: 0.7 },
-      hoverinfo: 'text'
-    };
-    const traceNoRCA = {
-      x: rcaNo.map(r => r.industry_feasibility),
-      y: rcaNo.map(r => r.industry_complexity),
-      text: rcaNo.map(r => r.industry_description + '<br>Industry Code: ' + r.industry_code + '<br>Feasibility: ' + fmt(r.industry_feasibility, 4)),
-      mode: 'markers',
-      type: 'scatter',
-      name: 'No Comparative Advantage',
-      marker: { color: CB_PAIRED[0], size: 6, opacity: 0.5 },
-      hoverinfo: 'text'
-    };
-
-    Plotly.newPlot(plotEl, [traceNoRCA, traceRCA], {
-      xaxis: { title: 'Industry Feasibility', zeroline: false },
-      yaxis: { title: 'Industry Complexity', zeroline: false },
-      images: rmiLogoImages(),
-      margin: { t: 30, r: 20, b: 50, l: 60 },
-      height: chartH(450),
-      legend: { x: 0, y: 1, bgcolor: 'rgba(255,255,255,0.8)' },
-      font: { family: 'Source Sans Pro, Roboto, sans-serif' }
-    }, { responsive: true });
-
-    // Export bar for scatter plot
-    chartDiv.appendChild(buildExportBar(plotEl, 'industry_feasibility_complexity', () => ({
-      rows: enriched.filter(r => r.industry_complexity != null),
-      columns: [
-        { key: 'industry_code', label: 'Industry Code' },
-        { key: 'industry_description', label: 'Industry' },
-        { key: 'industry_feasibility', label: 'Feasibility' },
-        { key: 'industry_complexity', label: 'Industry Complexity' },
-        { key: 'location_quotient', label: 'Location Quotient' },
-        { key: 'industry_comparative_advantage', label: 'Comparative Advantage' }
-      ]
-    })));
-
-  } catch (err) {
-    console.error(err);
-    const container = document.getElementById('reg-results');
-    container.innerHTML = '<div class="empty-state"><h2>Error</h2><p>' + err.message + '</p></div>';
-    container.style.display = '';
-    document.getElementById('reg-empty').style.display = 'none';
-  }
-  hideSpinner();
-}
-
-// ════════════════════════════════════════════
-//  TAB 2: NATIONAL VIEW
-// ════════════════════════════════════════════
+// ═══════════════════════════════════════
+//  NATIONAL VIEW
+// ═══════════════════════════════════════
 let natIndWidget = null;
 
-async function initNational() {
-  await ensureMeta();
-  await ensureIndustryMeta();
-  populateNatIndustryList();
-  updateNatStateFilter();
-  // Pre-select 335910 (Battery Manufacturing) and auto-load
-  if (natIndWidget) natIndWidget.setValue('335910', '335910 - ' + (industryTitles.get('335910') || 'Battery Manufacturing'));
-  // Skip auto-load if a hash route is present (applyHash will handle it)
-  const hash = window.location.hash;
-  if (!hash || !hash.startsWith('#/')) {
-    await loadNational();
-  }
-}
-
-function populateNatIndustryList() {
+function initNatControls() {
+  // Industry search
   const items = [];
-  industryTitles.forEach((desc, code) => {
-    items.push({ value: code, label: code + ' - ' + desc });
-  });
+  industryTitles.forEach((desc, code) => items.push({ value: code, label: code + ' - ' + desc }));
   items.sort((a, b) => a.label.localeCompare(b.label));
-  natIndWidget = createSearchSelect(
-    document.getElementById('nat-ind-search'), items,
-    'Search industry...', null
-  );
-}
+  natIndWidget = searchSelect(document.getElementById('nat-ind-search'), items, 'Search industry...');
+  natIndWidget.set('335910', '335910 - ' + (industryTitles.get('335910') || 'Battery Manufacturing'));
 
-function updateNatStateFilter() {
-  const level = document.getElementById('nat-level').value;
-  const wrap = document.getElementById('nat-state-filter-wrap');
-  wrap.style.display = level === 'county' ? '' : 'none';
-  if (level === 'county' && stateList) {
-    const sel = document.getElementById('nat-state-filter');
-    sel.innerHTML = '<option value="">All States</option>';
+  // State filter
+  if (stateList) {
+    const sel = document.getElementById('nat-state');
     stateList.forEach(s => {
-      const opt = document.createElement('option');
-      opt.value = s.fips;
-      opt.textContent = s.name;
-      sel.appendChild(opt);
+      const o = document.createElement('option');
+      o.value = s.fips; o.textContent = s.name;
+      sel.appendChild(o);
     });
   }
-}
 
-document.getElementById('nat-level').addEventListener('change', updateNatStateFilter);
-
-// Auto-zoom map when state filter changes
-document.getElementById('nat-state-filter').addEventListener('change', function() {
-  const stateFips = this.value;
-  zoomToState(stateFips || null);
-});
-
-document.getElementById('nat-mode').addEventListener('change', () => {
-  const mode = document.getElementById('nat-mode').value;
-  document.getElementById('nat-industry-wrap').style.display = mode === 'industry' ? '' : 'none';
-  document.getElementById('nat-metric-wrap').style.display = mode === 'industry' ? '' : 'none';
-  document.getElementById('nat-geo-metric-wrap').style.display = mode === 'geography' ? '' : 'none';
-});
-
-document.getElementById('nat-load').addEventListener('click', loadNational);
-
-// ── Map rendering helpers ──
-
-const METRIC_DESCRIPTIONS = {
-  economic_complexity_index: 'The Economic Complexity Index measures the diversity and sophistication of a region\'s productive capabilities, based on the industries in which it has comparative advantage.',
-  economic_complexity_percentile_score: 'Percentile ranking of each region\'s Economic Complexity Index relative to all regions at the same geographic level.',
-  industrial_diversity: 'Count of distinct six-digit industries in which the region has measurable employment.',
-  strategic_index: 'The Strategic Index captures the potential for a region to improve its economic complexity through feasible industry development.',
-  strategic_index_percentile: 'Percentile ranking of each region\'s Strategic Index relative to all regions at the same geographic level.',
-  location_quotient: 'The Location Quotient measures the concentration of industry employment in each region relative to the national average. A value greater than 1 indicates specialization.',
-  industry_comparative_advantage: 'Whether a region has a comparative advantage in this industry, defined as a Location Quotient greater than 1.',
-  industry_feasibility: 'A measure of how feasible it is for each region to develop this industry, based on proximity to related industries already present.',
-  industry_feasibility_percentile_score: 'Percentile ranking of how feasible it is for each region to develop this industry, based on proximity to related industries already present.',
-  strategic_gain: 'The potential economic complexity gain from developing this industry in each region.',
-  strategic_gain_percentile_score: 'Percentile ranking of the potential economic complexity gain from developing this industry in each region.',
-  strategic_gain_possible: 'Whether there is a feasible path for strategic gain from developing this industry.',
-  industry_employment_share: 'Share of total regional employment accounted for by this industry.',
-  industry_present: 'Whether the industry has measurable employment in each region.'
-};
-
-function buildMapContainer(container, mapId, metricLabel, metricKey, level, getDataFn) {
-  const mapWrap = document.createElement('div');
-  mapWrap.className = 'map-container';
-
-  const mapTitle = document.createElement('div');
-  mapTitle.className = 'section-title';
-  mapTitle.textContent = metricLabel + ' by ' + LEVEL_LABEL[level];
-  mapWrap.appendChild(mapTitle);
-
-  const plotEl = document.createElement('div');
-  plotEl.id = mapId;
-  plotEl.style.width = '100%';
-  plotEl.style.minHeight = '600px';
-  mapWrap.appendChild(plotEl);
-
-  const desc = document.createElement('div');
-  desc.className = 'map-description';
-  desc.textContent = METRIC_DESCRIPTIONS[metricKey] || ('Geographic distribution of ' + metricLabel + ' across ' + LEVEL_LABEL[level] + '-level regions.');
-  mapWrap.appendChild(desc);
-
-  mapWrap.appendChild(buildExportBar(plotEl, metricKey + '_' + level + '_map', getDataFn || null));
-
-  container.appendChild(mapWrap);
-  return plotEl;
-}
-
-// Touch-friendly tooltip: on tap, show tooltip; on tap elsewhere, hide it
-function addTouchTooltip(selection, plotEl, tooltip, tipFn) {
-  let activeEl = null;
-  selection.on('touchstart', function(event, d) {
-    event.preventDefault(); // prevent double-fire of mouse events
-    const tip = tipFn(d);
-    if (!tip) return;
-    // Reset previous highlight
-    if (activeEl && activeEl !== this) {
-      d3.select(activeEl).dispatch('mouseleave');
-    }
-    activeEl = this;
-    // Trigger mouseenter to reuse existing highlight logic
-    d3.select(this).dispatch('mouseenter', { detail: event });
-    // Position tooltip at touch point
-    const touch = event.touches ? event.touches[0] : event;
-    const rect = plotEl.getBoundingClientRect();
-    tooltip.style.left = (touch.clientX - rect.left + 14) + 'px';
-    tooltip.style.top = (touch.clientY - rect.top - 50) + 'px';
-  }, { passive: false });
-
-  // Tap on empty area to dismiss
-  d3.select(plotEl).on('touchstart.dismiss', function(event) {
-    if (event.target.tagName !== 'path' && activeEl) {
-      d3.select(activeEl).dispatch('mouseleave');
-      activeEl = null;
-    }
-  });
-}
-
-async function renderStateMap(plotEl, geos, metricKey, metricLabel) {
-  // Build state FIPS -> value/name maps
-  const stateValMap = new Map();
-  const stateTipMap = new Map();
-  geos.forEach(g => {
-    const fips = String(g.geoid).padStart(2, '0');
-    if (g[metricKey] == null) return;
-    stateValMap.set(fips, g[metricKey]);
-    stateTipMap.set(fips, (g.name || fips) + '\n' + metricLabel + ': ' + fmt(g[metricKey]));
+  // Mode toggle
+  document.getElementById('nat-mode').addEventListener('change', () => {
+    const m = document.getElementById('nat-mode').value;
+    document.getElementById('nat-ind-wrap').style.display = m === 'industry' ? '' : 'none';
+    document.getElementById('nat-ind-metric-wrap').style.display = m === 'industry' ? '' : 'none';
+    document.getElementById('nat-geo-metric-wrap').style.display = m === 'geography' ? '' : 'none';
   });
 
-  if (stateValMap.size === 0) {
-    plotEl.innerHTML = '<div style="padding:40px;text-align:center;color:#666;font-style:italic;">No geographic data available for this selection.</div>';
-    return;
-  }
-
-  // Load state TopoJSON for rendering
-  const statesTopo = await fetchStatesTopo();
-  const stateFeatures = topojson.feature(statesTopo, statesTopo.objects.states);
-
-  // Map state TopoJSON IDs to FIPS (us-atlas uses numeric FIPS IDs)
-  const stateValByTopoId = new Map();
-  const stateTipByTopoId = new Map();
-  stateFeatures.features.forEach(f => {
-    const fips = String(f.id).padStart(2, '0');
-    if (stateValMap.has(fips)) {
-      stateValByTopoId.set(f.id, stateValMap.get(fips));
-      stateTipByTopoId.set(f.id, stateTipMap.get(fips));
-    }
+  // Level toggle for state filter
+  document.getElementById('nat-level').addEventListener('change', () => {
+    document.getElementById('nat-state-wrap').style.display = document.getElementById('nat-level').value === 'county' ? '' : 'none';
   });
 
-  // Continuous color scale with percentile clipping
-  const allVals = Array.from(stateValMap.values());
-  const colorInfo = buildContinuousColor(allVals, metricKey);
-  const color = colorInfo.scale;
-
-  // Dimensions — on mobile, legend goes below the map
-  const width = plotEl.clientWidth || 960;
-  const mobile = window._isMobile && window._isMobile();
-  const legendGap = mobile ? 0 : 145;
-  const mapW = width - legendGap;
-  const mapH = Math.round(mapW * 0.62);
-  const legendBelow = mobile ? 50 : 0;
-  const height = mapH + legendBelow;
-
-  plotEl.innerHTML = '';
-
-  // Tooltip
-  let tooltip = plotEl.parentElement.querySelector('.map-tooltip');
-  if (!tooltip) {
-    tooltip = document.createElement('div');
-    tooltip.className = 'map-tooltip';
-    plotEl.parentElement.style.position = 'relative';
-    plotEl.parentElement.appendChild(tooltip);
-  }
-
-  // Controls
-  const controls = document.createElement('div');
-  controls.className = 'map-controls';
-  const hint = document.createElement('span');
-  hint.className = 'zoom-hint';
-  hint.textContent = mobile ? 'Tap a state to explore' : 'Click a state to explore its Regional View';
-  controls.appendChild(hint);
-  plotEl.appendChild(controls);
-
-  // Projection
-  const projection = d3.geoAlbersUsa().fitSize([mapW, mapH], stateFeatures);
-  const path = d3.geoPath(projection);
-
-  const svg = d3.select(plotEl).append('svg')
-    .attr('width', width)
-    .attr('height', height)
-    .attr('viewBox', '0 0 ' + width + ' ' + height)
-    .style('display', 'block')
-    .style('max-width', '100%')
-    .style('height', 'auto')
-    .style('font-family', 'Source Sans Pro, Roboto, sans-serif');
-
-  // State fills
-  svg.append('g')
-    .selectAll('path')
-    .data(stateFeatures.features)
-    .join('path')
-    .attr('d', path)
-    .attr('fill', d => {
-      const val = stateValByTopoId.get(d.id);
-      return val != null ? color(val) : '#e8e8e8';
-    })
-    .attr('stroke', '#666')
-    .attr('stroke-width', 1.2)
-    .style('cursor', d => stateValByTopoId.has(d.id) ? 'pointer' : 'default')
-    .on('mouseenter', function(event, d) {
-      const tip = stateTipByTopoId.get(d.id);
-      if (!tip) return;
-      d3.select(this).attr('stroke', '#45CFCC').attr('stroke-width', 2.5).style('fill-opacity', 0.92).raise();
-      // Re-draw state mesh on top after raising
-      svg.select('.state-mesh-overlay').raise();
-      tooltip.style.display = 'block';
-      tooltip.innerHTML = '';
-      const val = stateValByTopoId.get(d.id);
-      const lines = tip.split('\n');
-      const nameEl = document.createElement('b');
-      nameEl.textContent = lines[0];
-      tooltip.appendChild(nameEl);
-      for (let i = 1; i < lines.length; i++) {
-        tooltip.appendChild(document.createElement('br'));
-        tooltip.appendChild(document.createTextNode(lines[i]));
-      }
-      if (val != null) {
-        const rank = allVals.filter(v => v <= val).length;
-        tooltip.appendChild(document.createElement('br'));
-        tooltip.appendChild(document.createTextNode('Percentile: ' + Math.round(100 * rank / allVals.length) + '%'));
-      }
-    })
-    .on('mousemove', function(event) {
-      const rect = plotEl.getBoundingClientRect();
-      tooltip.style.left = (event.clientX - rect.left + 12) + 'px';
-      tooltip.style.top = (event.clientY - rect.top - 10) + 'px';
-    })
-    .on('mouseleave', function() {
-      d3.select(this).attr('stroke', '#666').attr('stroke-width', 1.2).style('fill-opacity', 1);
-      tooltip.style.display = 'none';
-    })
-    .on('click', function(event, d) {
-      const fips = String(d.id).padStart(2, '0');
-      if (stateValMap.has(fips)) {
-        navigateToRegional('state', fips);
-      }
-    });
-
-  // Touch tooltip support for mobile
-  addTouchTooltip(
-    svg.selectAll('path').filter(d => d && stateTipByTopoId.has(d.id)),
-    plotEl, tooltip,
-    d => stateTipByTopoId.get(d.id)
-  );
-
-  // State boundary lines (mesh overlay — stays on top during hover)
-  const stateMesh = topojson.mesh(statesTopo, statesTopo.objects.states, (a, b) => a !== b);
-  svg.append('path')
-    .attr('class', 'state-mesh-overlay')
-    .datum(stateMesh)
-    .attr('d', path)
-    .attr('fill', 'none')
-    .attr('stroke', '#333')
-    .attr('stroke-width', 1.2)
-    .attr('stroke-linejoin', 'round')
-    .style('pointer-events', 'none');
-
-  // Legend — on mobile: horizontal below map; on desktop: vertical right side
-  const breaks = colorInfo.breaks;
-  const nLegendSteps = colorInfo.isBinary ? 2 : 7;
-  const boxH = mobile ? 14 : 18;
-  let legendX, legendY;
-  if (mobile) {
-    legendX = 0;
-    legendY = mapH + 6;
-  } else {
-    legendX = mapW + 16;
-    const totalLegH = nLegendSteps * boxH;
-    legendY = (height - totalLegH) / 2 - 16;
-  }
-  const lg = svg.append('g').attr('transform', 'translate(' + legendX + ',' + legendY + ')');
-
-  lg.append('text').attr('x', 0).attr('y', 0)
-    .style('font-size', '11px').style('font-weight', '600')
-    .text(metricLabel);
-
-  const valFmt = d3.max(allVals) >= 100 ? d3.format(',.0f') : d3.max(allVals) >= 1 ? d3.format('.1f') : d3.format('.2f');
-
-  if (colorInfo.isBinary) {
-    [{ c: '#2c7bb6', label: 'Yes' }, { c: '#e8e8e8', label: 'No' }].forEach((item, i) => {
-      const y = 14 + i * boxH;
-      lg.append('rect').attr('x', 0).attr('y', y).attr('width', 16).attr('height', boxH - 3).attr('fill', item.c).attr('stroke', '#999').attr('stroke-width', 0.5);
-      lg.append('text').attr('x', 22).attr('y', y + boxH / 2 + 1).attr('dominant-baseline', 'middle').style('font-size', '10px').text(item.label);
-    });
-  } else {
-    const legBreaks = breaks;
-    for (let i = nLegendSteps - 1; i >= 0; i--) {
-      const ri = nLegendSteps - 1 - i;
-      const lo = legBreaks[i];
-      const hi = legBreaks[i + 1];
-      const midVal = (lo + hi) / 2;
-      const y = 14 + ri * boxH;
-      lg.append('rect').attr('x', 0).attr('y', y)
-        .attr('width', 16).attr('height', boxH - 3)
-        .attr('fill', color(midVal)).attr('stroke', '#999').attr('stroke-width', 0.5);
-      lg.append('text').attr('x', 22).attr('y', y + boxH / 2 + 1)
-        .attr('dominant-baseline', 'middle')
-        .style('font-size', '10px')
-        .text(valFmt(lo) + ' \u2013 ' + valFmt(hi));
-    }
-  }
-
-  const noDataY = 14 + nLegendSteps * boxH + 6;
-  lg.append('rect').attr('x', 0).attr('y', noDataY)
-    .attr('width', 16).attr('height', boxH - 3)
-    .attr('fill', '#e8e8e8').attr('stroke', '#999').attr('stroke-width', 0.5);
-  lg.append('text').attr('x', 22).attr('y', noDataY + boxH / 2 + 1)
-    .attr('dominant-baseline', 'middle')
-    .style('font-size', '10px')
-    .text('No data');
-}
-
-// Cache for US states TopoJSON (for state boundary overlay)
-let _statesTopo = null;
-async function fetchStatesTopo() {
-  if (_statesTopo) return _statesTopo;
-  const resp = await fetch(BASE + 'states-10m.json');
-  _statesTopo = await resp.json();
-  return _statesTopo;
-}
-
-// Convert Plotly-format colorscale to a D3 interpolator
-function plotlyScaleToD3(cs, zmin, zmax) {
-  const domain = cs.map(c => zmin + c[0] * (zmax - zmin));
-  const range = cs.map(c => c[1]);
-  return d3.scaleLinear().domain(domain).range(range).clamp(true);
-}
-
-// ── Locator mini-map for Regional View ──
-async function renderLocatorMap(el, level, geoid) {
-  try {
-    const statesTopo = await fetchStatesTopo();
-    const stateFeatures = topojson.feature(statesTopo, statesTopo.objects.states);
-    const stateMesh = topojson.mesh(statesTopo, statesTopo.objects.states, (a, b) => a !== b);
-
-    const w = 280, h = 180;
-    const projection = d3.geoAlbersUsa().fitSize([w - 10, h - 10], stateFeatures).translate([w / 2, h / 2]);
-    const path = d3.geoPath(projection);
-
-    const svg = d3.select(el).append('svg')
-      .attr('width', w).attr('height', h)
-      .attr('viewBox', '0 0 ' + w + ' ' + h)
-      .style('display', 'block')
-      .style('border', '1px solid #e0e0e0')
-      .style('border-radius', '6px')
-      .style('background', '#fafafa');
-
-    // Draw all states in light gray
-    svg.append('g').selectAll('path')
-      .data(stateFeatures.features)
-      .join('path')
-      .attr('d', path)
-      .attr('fill', '#e8e8e8')
-      .attr('stroke', '#ccc')
-      .attr('stroke-width', 0.5);
-
-    if (level === 'state') {
-      // Highlight the state
-      const stateFips = geoid.padStart(2, '0');
-      const stateId = parseInt(stateFips);
-      svg.selectAll('path')
-        .filter(d => d.id === stateId || String(d.id).padStart(2, '0') === stateFips)
-        .attr('fill', '#45CFCC')
-        .attr('stroke', '#003B63')
-        .attr('stroke-width', 1.5);
-    } else {
-      // For county/CBSA/CSA/CZ, highlight the county or counties
-      const geojson = await fetchGeoJSON();
-      let highlightFeatures = [];
-      if (level === 'county') {
-        highlightFeatures = geojson.features.filter(f => f.id === geoid);
-      } else {
-        // Find all counties belonging to this parent region
-        const parentKey = level === 'cbsa' ? 'cbsa' : level === 'csa' ? 'csa' : 'cz';
-        highlightFeatures = geojson.features.filter(f => {
-          const parent = countyToParent ? countyToParent.get(f.id) : null;
-          if (!parent) return false;
-          const parentInfo = parent[parentKey];
-          return parentInfo && String(parentInfo.geoid) === String(geoid);
-        });
-      }
-
-      if (highlightFeatures.length > 0) {
-        // Highlight the parent state first
-        const stateFips = highlightFeatures[0].id.substring(0, 2);
-        const stateId = parseInt(stateFips);
-        svg.selectAll('path')
-          .filter(d => d.id === stateId)
-          .attr('fill', '#d0eeed');
-
-        // Draw the highlighted region
-        svg.append('g').selectAll('path')
-          .data(highlightFeatures)
-          .join('path')
-          .attr('d', path)
-          .attr('fill', '#45CFCC')
-          .attr('stroke', '#003B63')
-          .attr('stroke-width', 1);
-
-        // Add a pulsing dot at the centroid for visibility (small regions are hard to see)
-        const fc = { type: 'FeatureCollection', features: highlightFeatures };
-        const centroid = path.centroid(fc);
-        if (centroid[0] && centroid[1]) {
-          svg.append('circle')
-            .attr('cx', centroid[0]).attr('cy', centroid[1])
-            .attr('r', 4)
-            .attr('fill', '#003B63')
-            .attr('opacity', 0.7);
-        }
-      }
-    }
-
-    // State boundaries on top
-    svg.append('path').datum(stateMesh)
-      .attr('d', path).attr('fill', 'none')
-      .attr('stroke', '#aaa').attr('stroke-width', 0.5)
-      .style('pointer-events', 'none');
-
-  } catch(e) { console.warn('Locator map failed:', e); }
-}
-
-// Track last-rendered county map for auto-zoom
-let _lastCountyMap = null;
-
-async function renderCountyMap(plotEl, dataMap, metricKey, metricLabel, level, parentGeoMap) {
-  let geojson;
-  try {
-    geojson = await fetchGeoJSON();
-  } catch (e) {
-    plotEl.innerHTML = '<div style="padding:40px;text-align:center;color:#c00;">Failed to load county boundaries. Please reload the page.</div>';
-    console.error('GeoJSON fetch failed:', e);
-    return;
-  }
-
-  // Build per-county value + hover text maps, and track parent region IDs
-  const valMap = new Map();   // fips -> numeric value
-  const tipMap = new Map();   // fips -> hover HTML
-  const countyRegionMap = new Map(); // fips -> parent region geoid (for boundary overlays)
-
-  if (level === 'county') {
-    geojson.features.forEach(f => {
-      const fips = f.id;
-      if (!dataMap.has(fips)) return;
-      const val = dataMap.get(fips);
-      valMap.set(fips, val);
-      tipMap.set(fips, getCountyDisplayName(fips) + '\n' + metricLabel + ': ' + fmt(val));
-      countyRegionMap.set(fips, fips);
-    });
-  } else {
-    const parentKey = level === 'cbsa' ? 'cbsa' : level === 'csa' ? 'csa' : 'cz';
-    geojson.features.forEach(f => {
-      const fips = f.id;
-      const parent = countyToParent ? countyToParent.get(fips) : null;
-      if (!parent) return;
-      const parentInfo = parent[parentKey];
-      if (!parentInfo || !parentInfo.geoid) return;
-      const val = dataMap.get(String(parentInfo.geoid));
-      if (val == null) return;
-      valMap.set(fips, val);
-      countyRegionMap.set(fips, String(parentInfo.geoid));
-      const countyName = parent.county_name || fips;
-      const parentName = parentInfo.name || parentInfo.geoid;
-      tipMap.set(fips, countyName + '\n' + LEVEL_LABEL[level] + ': ' + parentName + '\n' + metricLabel + ': ' + fmt(val));
-    });
-  }
-
-  if (valMap.size === 0) {
-    plotEl.innerHTML = '<div style="padding:40px;text-align:center;color:#666;font-style:italic;">No geographic data available for this selection.</div>';
-    return;
-  }
-
-  // Continuous color scale with percentile clipping
-  const allVals = Array.from(valMap.values());
-  const colorInfo = buildContinuousColor(allVals, metricKey);
-  const color = colorInfo.scale;
-
-  // Dimensions — on mobile, legend goes below
-  const width = plotEl.clientWidth || 960;
-  const mobile = window._isMobile && window._isMobile();
-  const legendGap = mobile ? 0 : 145;
-  const mapW = width - legendGap;
-  const mapH = Math.round(mapW * 0.62);
-  const legendBelow = mobile ? 50 : 0;
-  const height = mapH + legendBelow;
-
-  // Clear previous content
-  plotEl.innerHTML = '';
-
-  // Tooltip div
-  let tooltip = plotEl.parentElement.querySelector('.map-tooltip');
-  if (!tooltip) {
-    tooltip = document.createElement('div');
-    tooltip.className = 'map-tooltip';
-    plotEl.parentElement.style.position = 'relative';
-    plotEl.parentElement.appendChild(tooltip);
-  }
-
-  // Map controls bar
-  const controls = document.createElement('div');
-  controls.className = 'map-controls';
-  const resetBtn = document.createElement('button');
-  resetBtn.textContent = 'Reset Zoom';
-  resetBtn.title = 'Reset to full US view';
-  controls.appendChild(resetBtn);
-  const hint = document.createElement('span');
-  hint.className = 'zoom-hint';
-  hint.textContent = mobile ? 'Pinch to zoom \u00B7 Tap a region' : 'Scroll to zoom \u00B7 Drag to pan \u00B7 Click a region to explore';
-  controls.appendChild(hint);
-  plotEl.appendChild(controls);
-
-  // Projection & path
-  const projection = d3.geoAlbersUsa().fitSize([mapW, mapH], geojson);
-  const path = d3.geoPath(projection);
-
-  const svg = d3.select(plotEl).append('svg')
-    .attr('width', width)
-    .attr('height', height)
-    .attr('viewBox', '0 0 ' + width + ' ' + height)
-    .style('display', 'block')
-    .style('max-width', '100%')
-    .style('height', 'auto')
-    .style('cursor', 'grab')
-    .style('font-family', 'Source Sans Pro, Roboto, sans-serif');
-
-  // Zoomable group — contains map content
-  const mapG = svg.append('g').attr('class', 'map-zoom-group');
-
-  // Legend group — stays fixed (outside zoom group)
-  const legendG = svg.append('g').attr('class', 'map-legend-group');
-
-  // Zoom behavior
-  const zoom = d3.zoom()
-    .scaleExtent([1, 20])
-    .translateExtent([[0, 0], [width, height]])
-    .on('zoom', (event) => {
-      mapG.attr('transform', event.transform);
-      // Scale strokes inversely so they stay crisp
-      mapG.selectAll('.county-path').attr('stroke-width', 0.5 / event.transform.k);
-      mapG.selectAll('.state-boundary').attr('stroke-width', 1.5 / event.transform.k);
-      mapG.selectAll('.region-boundary').attr('stroke-width', 2 / event.transform.k);
-    })
-    .on('start', () => svg.style('cursor', 'grabbing'))
-    .on('end', () => svg.style('cursor', 'grab'));
-
-  svg.call(zoom);
-  resetBtn.addEventListener('click', () => {
-    svg.transition().duration(500).call(zoom.transform, d3.zoomIdentity);
-  });
-
-  // Draw county fills
-  mapG.selectAll('.county-path')
-    .data(geojson.features)
-    .join('path')
-    .attr('class', 'county-path')
-    .attr('d', path)
-    .attr('fill', d => {
-      const val = valMap.get(d.id);
-      return val != null ? color(val) : '#e8e8e8';
-    })
-    .attr('stroke', '#ffffff')
-    .attr('stroke-width', 0.5)
-    .style('cursor', d => valMap.has(d.id) ? 'pointer' : 'default')
-    .on('mouseenter', function(event, d) {
-      const tip = tipMap.get(d.id);
-      if (!tip) return;
-      d3.select(this).attr('stroke', '#0f172a').attr('stroke-width', 1.5).style('fill-opacity', 0.92);
-      // Move hovered county to front, then re-raise boundaries
-      this.parentNode.appendChild(this);
-      // Re-draw state boundaries on top after raising county
-      mapG.selectAll('.state-boundary').raise();
-      tooltip.style.display = 'block';
-      tooltip.innerHTML = '';
-      const val = valMap.get(d.id);
-      const lines = tip.split('\n');
-      // First line = geography name (bold)
-      const nameEl = document.createElement('b');
-      nameEl.textContent = lines[0];
-      tooltip.appendChild(nameEl);
-      // Remaining lines = metric values
-      for (let i = 1; i < lines.length; i++) {
-        tooltip.appendChild(document.createElement('br'));
-        tooltip.appendChild(document.createTextNode(lines[i]));
-      }
-      // Percentile rank
-      if (val != null) {
-        const rank = allVals.filter(v => v <= val).length;
-        tooltip.appendChild(document.createElement('br'));
-        const pctEl = document.createTextNode('Percentile: ' + Math.round(100 * rank / allVals.length) + '%');
-        tooltip.appendChild(pctEl);
-      }
-    })
-    .on('mousemove', function(event) {
-      const rect = plotEl.getBoundingClientRect();
-      tooltip.style.left = (event.clientX - rect.left + 14) + 'px';
-      tooltip.style.top = (event.clientY - rect.top - 12) + 'px';
-    })
-    .on('mouseleave', function() {
-      d3.select(this).attr('stroke', '#ffffff').attr('stroke-width', 0.5).style('fill-opacity', 1);
-      tooltip.style.display = 'none';
-    })
-    .on('click', function(event, d) {
-      if (!valMap.has(d.id)) return;
-      // Navigate to Regional View for this county (or its parent region)
-      let navLevel = level;
-      let navGeoid = d.id;
-      if (level !== 'county') {
-        // For CBSA/CSA/CZ, navigate to the parent region
-        const regionId = countyRegionMap.get(d.id);
-        if (regionId) { navGeoid = regionId; }
-      }
-      navigateToRegional(navLevel, navGeoid);
-    });
-
-  // Touch tooltip support for mobile
-  addTouchTooltip(
-    mapG.selectAll('.county-path').filter(d => tipMap.has(d.id)),
-    plotEl, tooltip,
-    d => tipMap.get(d.id)
-  );
-
-  // Draw state boundaries on top — extracted from counties topology when available
-  try {
-    if (countyTopoJSON) {
-      // Extract state boundaries from county topology (same file, no extra fetch)
-      const stateMesh = topojson.mesh(countyTopoJSON, countyTopoJSON.objects.counties, (a, b) => {
-        return String(a.id).substring(0, 2) !== String(b.id).substring(0, 2);
-      });
-      mapG.append('path')
-        .attr('class', 'state-boundary')
-        .datum(stateMesh)
-        .attr('d', path)
-        .attr('fill', 'none')
-        .attr('stroke', '#fff')
-        .attr('stroke-width', 1.5)
-        .attr('stroke-linejoin', 'round')
-        .style('pointer-events', 'none');
-    } else {
-      // Fallback: use separate states TopoJSON
-      const statesTopo = await fetchStatesTopo();
-      const stateMesh = topojson.mesh(statesTopo, statesTopo.objects.states, (a, b) => a !== b);
-      mapG.append('path')
-        .attr('class', 'state-boundary')
-        .datum(stateMesh)
-        .attr('d', path)
-        .attr('fill', 'none')
-        .attr('stroke', '#fff')
-        .attr('stroke-width', 1.5)
-        .attr('stroke-linejoin', 'round')
-        .style('pointer-events', 'none');
-    }
-  } catch(e) { /* state boundaries optional */ }
-
-  // Draw CBSA/CSA/CZ region boundary overlays using topojson.mesh
-  if (level !== 'county' && countyTopoJSON) {
-    try {
-      // Use topojson.mesh with a filter: only draw boundaries between
-      // counties in different regions (= the outer boundary of each region)
-      const regionMesh = topojson.mesh(
-        countyTopoJSON,
-        countyTopoJSON.objects.counties,
-        (a, b) => {
-          const rA = countyRegionMap.get(String(a.id).padStart(5, '0'));
-          const rB = countyRegionMap.get(String(b.id).padStart(5, '0'));
-          // Draw edge when: one is in a region and the other isn't,
-          // or they're in different regions
-          return rA !== rB;
-        }
-      );
-      mapG.append('path')
-        .attr('class', 'region-boundary')
-        .datum(regionMesh)
-        .attr('d', path)
-        .attr('fill', 'none')
-        .attr('stroke', '#333')
-        .attr('stroke-width', 1.8)
-        .attr('stroke-linejoin', 'round')
-        .attr('stroke-opacity', 0.7)
-        .style('pointer-events', 'none');
-    } catch(e) { console.warn('Region boundaries failed:', e); }
-  }
-
-  // Legend (fixed, outside zoom group) — on mobile: horizontal below map
-  const breaks = colorInfo.breaks;
-  const nLegendSteps = colorInfo.isBinary ? 2 : 7;
-  const boxH = mobile ? 14 : 18;
-  let legendX, legendY;
-  if (mobile) {
-    legendX = 0;
-    legendY = mapH + 6;
-  } else {
-    legendX = mapW + 16;
-    const totalLegH = nLegendSteps * boxH;
-    legendY = (height - totalLegH) / 2 - 16;
-  }
-  const lg = legendG.append('g').attr('transform', 'translate(' + legendX + ',' + legendY + ')');
-
-  lg.append('text')
-    .attr('x', 0).attr('y', 0)
-    .style('font-size', '11px').style('font-weight', '600')
-    .text(metricLabel);
-
-  const valFmt = d3.max(allVals) >= 100 ? d3.format(',.0f') : d3.max(allVals) >= 1 ? d3.format('.1f') : d3.format('.2f');
-
-  if (colorInfo.isBinary) {
-    // Binary legend
-    [{ c: '#2c7bb6', label: 'Yes' }, { c: '#e8e8e8', label: 'No' }].forEach((item, i) => {
-      const y = 14 + i * boxH;
-      lg.append('rect').attr('x', 0).attr('y', y).attr('width', 16).attr('height', boxH - 3).attr('fill', item.c).attr('stroke', '#999').attr('stroke-width', 0.5);
-      lg.append('text').attr('x', 22).attr('y', y + boxH / 2 + 1).attr('dominant-baseline', 'middle').style('font-size', '10px').text(item.label);
-    });
-  } else {
-    // Continuous gradient legend — show color swatches at evenly-spaced breakpoints
-    const legBreaks = breaks;
-    for (let i = nLegendSteps - 1; i >= 0; i--) {
-      const ri = nLegendSteps - 1 - i;
-      const lo = legBreaks[i];
-      const hi = legBreaks[i + 1];
-      const midVal = (lo + hi) / 2;
-      const y = 14 + ri * boxH;
-      lg.append('rect')
-        .attr('x', 0).attr('y', y)
-        .attr('width', 16).attr('height', boxH - 3)
-        .attr('fill', color(midVal)).attr('stroke', '#999').attr('stroke-width', 0.5);
-      lg.append('text')
-        .attr('x', 22).attr('y', y + boxH / 2 + 1)
-        .attr('dominant-baseline', 'middle')
-        .style('font-size', '10px')
-        .text(valFmt(lo) + ' \u2013 ' + valFmt(hi));
-    }
-  }
-
-  const noDataY = 14 + nLegendSteps * boxH + 6;
-  lg.append('rect')
-    .attr('x', 0).attr('y', noDataY)
-    .attr('width', 16).attr('height', boxH - 3)
-    .attr('fill', '#e8e8e8').attr('stroke', '#999').attr('stroke-width', 0.5);
-  lg.append('text')
-    .attr('x', 22).attr('y', noDataY + boxH / 2 + 1)
-    .attr('dominant-baseline', 'middle')
-    .style('font-size', '10px')
-    .text('No data');
-
-  // Store references for auto-zoom
-  _lastCountyMap = { svg, zoom, projection, path, geojson, mapW, mapH, width, height, level };
-}
-
-// Navigate to Regional View for a given geography
-function navigateToRegional(level, geoid) {
-  // Switch to Regional tab
-  const regBtn = document.querySelector('[data-tab="regional"]');
-  if (regBtn) regBtn.click();
-  // Set level
-  const regLevel = document.getElementById('reg-level');
-  regLevel.value = level;
-  populateRegGeoList();
-  // Find the display name
-  const paddedGeoid = padGeoid(geoid, level);
-  const geoName = level === 'county' ? getCountyDisplayName(paddedGeoid) : getGeoName(geoid, level);
-  // Set the search widget and trigger load
-  if (regGeoWidget) {
-    regGeoWidget.setValue(paddedGeoid, geoName);
-  }
-  regSelectedGeo = paddedGeoid;
-  loadRegional(level, paddedGeoid);
-}
-
-// Auto-zoom map to a specific state's counties
-function zoomToState(stateFips) {
-  if (!_lastCountyMap) return;
-  const { svg, zoom, projection, path, geojson, mapW, mapH, width, height } = _lastCountyMap;
-  if (!stateFips) {
-    // Reset zoom
-    svg.transition().duration(500).call(zoom.transform, d3.zoomIdentity);
-    return;
-  }
-  // Find all county features in this state
-  const stateFeatures = geojson.features.filter(f => f.id && f.id.startsWith(stateFips));
-  if (stateFeatures.length === 0) return;
-  const stateFC = { type: 'FeatureCollection', features: stateFeatures };
-  const bounds = path.bounds(stateFC);
-  const dx = bounds[1][0] - bounds[0][0];
-  const dy = bounds[1][1] - bounds[0][1];
-  const cx = (bounds[0][0] + bounds[1][0]) / 2;
-  const cy = (bounds[0][1] + bounds[1][1]) / 2;
-  const scale = Math.min(8, 0.9 / Math.max(dx / mapW, dy / mapH));
-  const translate = [mapW / 2 - scale * cx, mapH / 2 - scale * cy];
-  svg.transition().duration(700).call(
-    zoom.transform,
-    d3.zoomIdentity.translate(translate[0], translate[1]).scale(scale)
-  );
+  document.getElementById('nat-go').addEventListener('click', loadNational);
 }
 
 async function loadNational() {
-  const level = document.getElementById('nat-level').value;
-  const mode = document.getElementById('nat-mode').value;
-  showSpinner('Loading national data...');
-
+  spin('Loading national data...');
+  const out = document.getElementById('nat-content');
   try {
-    if (!metaGeo) metaGeo = await fetchCSV('meta/geography_specific.csv');
-    const container = document.getElementById('nat-results');
-    container.innerHTML = '';
-    container.style.display = '';
-    document.getElementById('nat-empty').style.display = 'none';
+    const level = document.getElementById('nat-level').value;
+    const mode = document.getElementById('nat-mode').value;
+    out.innerHTML = '';
 
     if (mode === 'geography') {
-      const metricKey = document.getElementById('nat-geo-metric').value;
-      const metricLabel = document.getElementById('nat-geo-metric').selectedOptions[0].text;
-      const stateFilter = level === 'county' ? document.getElementById('nat-state-filter').value : '';
-      let geos = getGeosByLevel(level);
+      const mk = document.getElementById('nat-geo-metric').value;
+      const ml = document.getElementById('nat-geo-metric').selectedOptions[0].text;
+      let geos = geosByLevel(level);
 
-      // Apply state filter for county level
-      if (level === 'county' && stateFilter) {
-        geos = geos.filter(g => {
-          const fips = String(g.geoid).padStart(5, '0');
-          return fips.startsWith(stateFilter);
-        });
+      // State filter
+      if (level === 'county' && document.getElementById('nat-state').value) {
+        const sf = document.getElementById('nat-state').value;
+        geos = geos.filter(g => String(g.geoid).padStart(5, '0').startsWith(sf));
       }
 
-      // Add state name to county display names
-      if (level === 'county') {
-        geos = geos.map(g => {
-          const fips = String(g.geoid).padStart(5, '0');
-          return { ...g, name: getCountyDisplayName(fips) };
-        });
-      }
-
-      // ── Choropleth Map ──
-      const mapPlotEl = buildMapContainer(container, 'nat-geo-map', metricLabel, metricKey, level, () => ({
-        rows: geos,
-        columns: [
-          { key: 'name', label: 'Geography' },
-          { key: 'geoid', label: 'GeoID' },
-          { key: metricKey, label: metricLabel }
-        ]
+      // Add display names
+      geos = geos.map(g => ({
+        ...g,
+        display: level === 'county' ? countyName(String(g.geoid).padStart(5, '0')) : g.name
       }));
 
-      if (level === 'state') {
-        await renderStateMap(mapPlotEl, geos, metricKey, metricLabel);
-      } else {
-        // Build dataMap: geoid -> metric value (pad FIPS codes)
-        const dataMap = new Map();
-        const padLen = level === 'county' ? 5 : 0;
-        geos.forEach(g => {
-          const id = padLen ? String(g.geoid).padStart(padLen, '0') : String(g.geoid);
-          dataMap.set(id, g[metricKey]);
-        });
-        await renderCountyMap(mapPlotEl, dataMap, metricKey, metricLabel, level, null);
-      }
-
-      // Summary stats
-      const vals = geos.map(g => g[metricKey]).filter(v => v != null && !isNaN(v));
-      const avg = vals.reduce((s, v) => s + v, 0) / vals.length;
-      const sorted = [...vals].sort((a, b) => a - b);
-      const min = sorted[0];
-      const max = sorted[sorted.length - 1];
-      const median = sorted[Math.floor(sorted.length / 2)];
-
-      const cardsDiv = document.createElement('div');
-      cardsDiv.className = 'cards';
-      cardsDiv.innerHTML =
-        '<div class="card"><div class="card-label">Count</div><div class="card-value">' + fmtInt(geos.length) + '</div></div>' +
-        '<div class="card"><div class="card-label">Average</div><div class="card-value">' + fmt(avg) + '</div></div>' +
-        '<div class="card"><div class="card-label">Median</div><div class="card-value">' + fmt(median) + '</div></div>' +
-        '<div class="card"><div class="card-label">Range</div><div class="card-value">' + fmt(min) + ' \u2013 ' + fmt(max) + '</div></div>';
-      container.appendChild(cardsDiv);
-
-      // Table
-      const stitle = document.createElement('div'); stitle.className = 'section-title'; stitle.textContent = metricLabel + ' by ' + LEVEL_LABEL[level];
-      container.appendChild(stitle);
-      const tw = document.createElement('div');
-      renderSortableTable(tw, [
-        { key: 'name', label: 'Geography' },
-        { key: 'geoid', label: 'GeoID', align: 'center' },
-        { key: metricKey, label: metricLabel, align: 'right', fmt: v => fmt(v) }
-      ], geos, metricKey, 'desc');
-      container.appendChild(tw);
-
-      // Histogram
-      const chtitle = document.createElement('div'); chtitle.className = 'section-title'; chtitle.textContent = metricLabel + ' Distribution';
-      container.appendChild(chtitle);
-      const chartDiv = document.createElement('div'); chartDiv.className = 'chart-container';
-      const plotEl = document.createElement('div'); plotEl.id = 'nat-hist';
-      chartDiv.appendChild(plotEl); container.appendChild(chartDiv);
-
-      Plotly.newPlot(plotEl, [{
-        x: vals,
-        type: 'histogram',
-        marker: { color: CB_PAIRED[1], line: { color: CB_PAIRED[0], width: 1 } },
-        nbinsx: 40
-      }], {
-        xaxis: { title: metricLabel },
-        yaxis: { title: 'Count' },
-        images: rmiLogoImages(),
-        margin: { t: 20, r: 20, b: 50, l: 50 },
-        height: chartH(350),
-        font: { family: 'Source Sans Pro, Roboto, sans-serif' }
-      }, { responsive: true });
-
-      chartDiv.appendChild(buildExportBar(plotEl, metricKey + '_' + level + '_distribution', () => ({
-        rows: geos,
-        columns: [
-          { key: 'name', label: 'Geography' },
-          { key: 'geoid', label: 'GeoID' },
-          { key: metricKey, label: metricLabel }
-        ]
-      })));
-
+      renderNatResults(out, geos, mk, ml, level, null);
     } else {
-      // Industry mode
-      const indCode = natIndWidget ? natIndWidget.getValue() : null;
-      if (!indCode) { container.innerHTML = '<div class="empty-state"><p>Please select an industry first.</p></div>'; hideSpinner(); return; }
+      const indCode = natIndWidget ? natIndWidget.val() : null;
+      if (!indCode) { out.innerHTML = '<div class="empty"><p>Select an industry first.</p></div>'; unspin(); return; }
 
-      let data = await fetchCSVGz('by_industry/' + level + '/' + indCode + '.csv.gz');
-      const metricKey = document.getElementById('nat-metric').value;
-      const metricLabel = document.getElementById('nat-metric').selectedOptions[0].text;
+      let data = await fetchGz('by_industry/' + level + '/' + indCode + '.csv.gz');
+      const mk = document.getElementById('nat-metric').value;
+      const ml = document.getElementById('nat-metric').selectedOptions[0].text;
       const indDesc = industryTitles.get(indCode) || indCode;
-      const stateFilter = level === 'county' ? document.getElementById('nat-state-filter').value : '';
 
-      // Apply state filter for county level
-      if (level === 'county' && stateFilter) {
-        data = data.filter(r => String(r.geoid).padStart(5, '0').startsWith(stateFilter));
+      // State filter
+      if (level === 'county' && document.getElementById('nat-state').value) {
+        const sf = document.getElementById('nat-state').value;
+        data = data.filter(r => String(r.geoid).padStart(5, '0').startsWith(sf));
       }
 
-      // Join geography names
-      const levelCode = LEVEL_MAP[level];
+      // Join names
       const geoMap = new Map();
-      metaGeo.filter(g => g.geo_aggregation_level === levelCode).forEach(g => geoMap.set(String(g.geoid), g.name));
+      metaGeo.filter(g => g.geo_aggregation_level === LEVELS[level]).forEach(g => geoMap.set(String(g.geoid), g.name));
+      data = data.map(r => ({
+        ...r,
+        display: level === 'county' ? countyName(String(r.geoid).padStart(5, '0')) : (geoMap.get(String(r.geoid)) || String(r.geoid))
+      }));
 
-      const rows = data.map(r => {
-        const geoid = String(r.geoid);
-        let geoName = geoMap.get(geoid) || geoid;
-        if (level === 'county') {
-          geoName = getCountyDisplayName(geoid.padStart(5, '0'));
-        }
-        return { ...r, geo_name: geoName };
-      });
+      const title = document.createElement('h2');
+      title.style.cssText = 'color:var(--blue);margin-bottom:16px;';
+      title.textContent = indCode + ' \u2014 ' + indDesc;
+      out.appendChild(title);
 
-      const titleEl = document.createElement('h2');
-      titleEl.style.cssText = 'color:var(--blue-spruce);margin-bottom:16px;';
-      titleEl.textContent = indCode + ' - ' + indDesc;
-      container.appendChild(titleEl);
-
-      // ── Choropleth Map for industry ──
-      {
-        const mapPlotEl = buildMapContainer(container, 'nat-ind-map', metricLabel + ' — ' + indDesc, metricKey, level, () => ({
-          rows: rows,
-          columns: [
-            { key: 'geo_name', label: 'Geography' },
-            { key: 'geoid', label: 'GeoID' },
-            { key: 'industry_present', label: 'Present' },
-            { key: 'industry_comparative_advantage', label: 'Comparative Advantage' },
-            { key: metricKey, label: metricLabel }
-          ]
-        }));
-        const dataMap = new Map();
-        const padLen = level === 'county' ? 5 : level === 'state' ? 2 : 0;
-        rows.forEach(r => {
-          const id = padLen ? String(r.geoid).padStart(padLen, '0') : String(r.geoid);
-          dataMap.set(id, r[metricKey]);
-        });
-
-        if (level === 'state') {
-          // Build pseudo-geo objects for state map
-          const pseudoGeos = rows.map(r => ({
-            geoid: r.geoid,
-            name: r.geo_name,
-            [metricKey]: r[metricKey]
-          }));
-          await renderStateMap(mapPlotEl, pseudoGeos, metricKey, metricLabel);
-        } else {
-          await renderCountyMap(mapPlotEl, dataMap, metricKey, metricLabel, level, geoMap);
-        }
-      }
-
-      // Summary stats
-      const vals = rows.map(r => r[metricKey]).filter(v => v != null && !isNaN(v));
-      const avg = vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : 0;
-      const present = rows.filter(r => r.industry_present === 1).length;
-      const rca = rows.filter(r => r.industry_comparative_advantage === 1).length;
-
-      const cardsDiv = document.createElement('div');
-      cardsDiv.className = 'cards';
-      cardsDiv.innerHTML =
-        '<div class="card"><div class="card-label">Geographies</div><div class="card-value">' + fmtInt(rows.length) + '</div></div>' +
-        '<div class="card"><div class="card-label">Present In</div><div class="card-value">' + fmtInt(present) + '</div><div class="card-sub">' + (rows.length ? ((present / rows.length) * 100).toFixed(1) : 0) + '% of geographies</div></div>' +
-        '<div class="card"><div class="card-label">Comparative Advantage</div><div class="card-value">' + fmtInt(rca) + '</div><div class="card-sub">' + (rows.length ? ((rca / rows.length) * 100).toFixed(1) : 0) + '% of geographies</div></div>' +
-        '<div class="card"><div class="card-label">Average ' + metricLabel + '</div><div class="card-value">' + fmt(avg) + '</div></div>';
-      container.appendChild(cardsDiv);
-
-      // Table
-      const stitle = document.createElement('div'); stitle.className = 'section-title'; stitle.textContent = metricLabel + ' by ' + LEVEL_LABEL[level];
-      container.appendChild(stitle);
-      const tw = document.createElement('div');
-      renderSortableTable(tw, [
-        { key: 'geo_name', label: 'Geography' },
-        { key: 'geoid', label: 'GeoID', align: 'center' },
-        { key: 'industry_present', label: 'Present', align: 'center', fmt: v => v === 1 ? '\u2713' : '' },
-        { key: 'industry_comparative_advantage', label: 'Comparative Advantage', align: 'center', fmt: v => v === 1 ? '\u2713' : '' },
-        { key: metricKey, label: metricLabel, align: 'right', fmt: v => metricKey === 'industry_present' || metricKey === 'industry_comparative_advantage' || metricKey === 'strategic_gain_possible' ? (v === 1 ? 'Yes' : 'No') : fmt(v, 3) }
-      ], rows, metricKey, 'desc');
-      container.appendChild(tw);
-
-      // Histogram
-      const chtitle = document.createElement('div'); chtitle.className = 'section-title'; chtitle.textContent = metricLabel + ' Distribution';
-      container.appendChild(chtitle);
-      const chartDiv = document.createElement('div'); chartDiv.className = 'chart-container';
-      const plotEl = document.createElement('div'); plotEl.id = 'nat-hist';
-      chartDiv.appendChild(plotEl); container.appendChild(chartDiv);
-
-      Plotly.newPlot(plotEl, [{
-        x: vals,
-        type: 'histogram',
-        marker: { color: CB_PAIRED[1], line: { color: CB_PAIRED[0], width: 1 } },
-        nbinsx: 40
-      }], {
-        xaxis: { title: metricLabel },
-        yaxis: { title: 'Count' },
-        images: rmiLogoImages(),
-        margin: { t: 20, r: 20, b: 50, l: 50 },
-        height: chartH(350),
-        font: { family: 'Source Sans Pro, Roboto, sans-serif' }
-      }, { responsive: true });
-
-      chartDiv.appendChild(buildExportBar(plotEl, metricKey + '_' + level + '_' + indCode + '_distribution', () => ({
-        rows: rows,
-        columns: [
-          { key: 'geo_name', label: 'Geography' },
-          { key: 'geoid', label: 'GeoID' },
-          { key: 'industry_present', label: 'Present' },
-          { key: 'industry_comparative_advantage', label: 'Comparative Advantage' },
-          { key: metricKey, label: metricLabel }
-        ]
-      })));
+      renderNatResults(out, data, mk, ml, level, indCode);
     }
-  } catch (err) {
-    console.error(err);
-    const container = document.getElementById('nat-results');
-    container.innerHTML = '<div class="empty-state"><h2>Error</h2><p>' + err.message + '</p></div>';
-    container.style.display = '';
-    document.getElementById('nat-empty').style.display = 'none';
+  } catch (e) {
+    console.error(e);
+    out.innerHTML = '<div class="empty"><h2>Error</h2><p>' + escHtml(e.message) + '</p></div>';
   }
-  hideSpinner();
+  unspin();
 }
 
-// ════════════════════════════════════════════
-//  TAB 3: INDUSTRY SPACE
-// ════════════════════════════════════════════
-let isGeoWidget = null;
+function renderNatResults(out, rows, mk, ml, level, indCode) {
+  // Map
+  const mapDiv = document.createElement('div');
+  mapDiv.className = 'chart-wrap';
+  const mapEl = document.createElement('div');
+  mapDiv.appendChild(mapEl);
+  out.appendChild(mapDiv);
 
-async function initIndustrySpace() {
-  await ensureMeta();
-  populateISGeoList();
+  if (level === 'state') {
+    renderStateMap(mapEl, rows, mk, ml);
+  } else {
+    renderPlotlyCountyMap(mapEl, rows, mk, ml, level);
+  }
+
+  // Summary cards
+  const vals = rows.map(r => r[mk]).filter(v => v != null && !isNaN(v));
+  if (vals.length) {
+    const avg = vals.reduce((s, v) => s + v, 0) / vals.length;
+    const sorted = [...vals].sort((a, b) => a - b);
+    const cd = document.createElement('div');
+    cd.className = 'cards';
+    cd.innerHTML =
+      '<div class="card"><div class="card-label">Count</div><div class="card-value">' + fmtInt(vals.length) + '</div></div>' +
+      '<div class="card"><div class="card-label">Average</div><div class="card-value">' + fmt(avg) + '</div></div>' +
+      '<div class="card"><div class="card-label">Median</div><div class="card-value">' + fmt(sorted[Math.floor(sorted.length / 2)]) + '</div></div>' +
+      '<div class="card"><div class="card-label">Range</div><div class="card-value">' + fmt(sorted[0]) + ' \u2013 ' + fmt(sorted[sorted.length - 1]) + '</div></div>';
+    out.appendChild(cd);
+  }
+
+  // Table
+  const tt = document.createElement('div');
+  tt.className = 'sec-title';
+  tt.textContent = ml + ' by ' + LEVEL_NAME[level];
+  out.appendChild(tt);
+  const tw = document.createElement('div');
+  out.appendChild(tw);
+  makeTable(tw, [
+    { key: 'display', label: 'Geography' },
+    { key: mk, label: ml, align: 'right', fmt: v => fmt(v, 3) }
+  ], rows, mk, 'desc');
+
+  // Histogram
+  if (vals.length > 1) {
+    const ht = document.createElement('div');
+    ht.className = 'sec-title';
+    ht.textContent = ml + ' Distribution';
+    out.appendChild(ht);
+    const hw = document.createElement('div');
+    hw.className = 'chart-wrap';
+    const he = document.createElement('div');
+    hw.appendChild(he);
+    out.appendChild(hw);
+    Plotly.newPlot(he, [{ x: vals, type: 'histogram', marker: { color: '#1f78b4' }, nbinsx: 40 }], {
+      xaxis: { title: ml }, yaxis: { title: 'Count' },
+      margin: { t: 20, r: 20, b: 50, l: 50 }, height: 300,
+      font: { family: 'Source Sans Pro, sans-serif' }
+    }, { responsive: true });
+  }
 }
 
-function populateISGeoList() {
-  const level = document.getElementById('is-level').value;
-  const geos = getGeosByLevel(level);
-  const items = geos.map(g => {
-    let label = g.name;
-    if (level === 'county') {
-      const fips = String(g.geoid).padStart(5, '0');
-      label = getCountyDisplayName(fips);
-    }
-    return { value: String(g.geoid), label: label };
-  }).sort((a, b) => a.label.localeCompare(b.label));
-  isGeoWidget = createSearchSelect(
-    document.getElementById('is-geo-search'), items,
-    'Highlight a ' + LEVEL_LABEL[level] + '...',
-    null
-  );
-}
-
-document.getElementById('is-level').addEventListener('change', populateISGeoList);
-
-document.getElementById('is-threshold').addEventListener('input', function () {
-  document.getElementById('is-thresh-val').textContent = this.value + '%';
-});
-
-document.getElementById('is-load').addEventListener('click', loadIndustrySpace);
-
-// Cache for force-directed layout positions
-const layoutCache = new Map();
-
-function runForceLayout(nodes, edges, levelCode) {
-  const cacheKey = levelCode + '_' + edges.length;
-  if (layoutCache.has(cacheKey)) return layoutCache.get(cacheKey);
-
-  // Seed the PRNG for reproducible layouts
-  let seed = 42;
-  function seededRandom() { seed = (seed * 16807 + 0) % 2147483647; return (seed - 1) / 2147483646; }
-
-  const nodeMap = new Map();
-  const simNodes = nodes.map((n, i) => {
-    const angle = seededRandom() * 2 * Math.PI;
-    const radius = seededRandom() * 400;
-    const sn = { id: String(n.industry_code), index: i, x: Math.cos(angle) * radius, y: Math.sin(angle) * radius };
-    nodeMap.set(sn.id, sn);
-    return sn;
+function renderStateMap(el, geos, mk, ml) {
+  // Use Plotly built-in US state map (no GeoJSON needed)
+  const abbrMap = new Map();
+  geos.forEach(g => {
+    const fips = String(g.geoid).padStart(2, '0');
+    const abbr = stateFipsToAbbr ? stateFipsToAbbr.get(fips) : null;
+    if (abbr) abbrMap.set(fips, abbr);
   });
 
-  const simLinks = edges.map(e => ({
-    source: nodeMap.get(String(e.from)),
-    target: nodeMap.get(String(e.to)),
-    weight: e.weight
-  })).filter(l => l.source && l.target);
+  const locs = [], vals = [], texts = [];
+  geos.forEach(g => {
+    const fips = String(g.geoid).padStart(2, '0');
+    const abbr = abbrMap.get(fips);
+    if (!abbr || g[mk] == null) return;
+    locs.push(abbr);
+    vals.push(g[mk]);
+    texts.push((g.display || g.name || fips) + '<br>' + ml + ': ' + fmt(g[mk], 3));
+  });
 
-  // Run d3-force simulation synchronously (tuned to approximate Fruchterman-Reingold)
-  const sim = d3.forceSimulation(simNodes)
-    .force('link', d3.forceLink(simLinks).id(d => d.id)
-      .distance(d => 80 * (1 - d.weight) + 5)
-      .strength(d => d.weight * 1.2))
-    .force('charge', d3.forceManyBody().strength(-40).distanceMax(400))
-    .force('center', d3.forceCenter(0, 0))
-    .force('collide', d3.forceCollide(6))
-    .stop();
+  Plotly.newPlot(el, [{
+    type: 'choropleth',
+    locationmode: 'USA-states',
+    locations: locs,
+    z: vals,
+    text: texts,
+    hoverinfo: 'text',
+    colorscale: 'YlGnBu',
+    colorbar: { title: ml, thickness: 15 }
+  }], {
+    geo: { scope: 'usa', projection: { type: 'albers usa' }, showlakes: false },
+    margin: { t: 10, r: 10, b: 10, l: 10 },
+    height: 500,
+    font: { family: 'Source Sans Pro, sans-serif' }
+  }, { responsive: true });
+}
 
-  // Run 400 iterations for better convergence
-  for (let i = 0; i < 400; i++) sim.tick();
+function renderPlotlyCountyMap(el, rows, mk, ml, level) {
+  // For county level, use Plotly choropleth with GeoJSON
+  // For CBSA/CSA/CZ, map parent values onto counties
+  const dataMap = new Map();
 
-  const positions = new Map();
-  simNodes.forEach(sn => positions.set(sn.id, { x: sn.x, y: sn.y }));
-  layoutCache.set(cacheKey, positions);
-  return positions;
+  if (level === 'county') {
+    rows.forEach(r => {
+      const fips = String(r.geoid).padStart(5, '0');
+      if (r[mk] != null) dataMap.set(fips, { val: r[mk], display: r.display || fips });
+    });
+  } else {
+    // Map parent region values to counties
+    const parentKey = level === 'cbsa' ? 'cbsa' : level === 'csa' ? 'csa' : 'cz';
+    const parentVals = new Map();
+    rows.forEach(r => parentVals.set(String(r.geoid), { val: r[mk], display: r.display || String(r.geoid) }));
+
+    if (countyToParent) {
+      countyToParent.forEach((parent, countyFips) => {
+        const pi = parent[parentKey];
+        if (!pi || !pi.geoid) return;
+        const pv = parentVals.get(String(pi.geoid));
+        if (pv && pv.val != null) {
+          dataMap.set(countyFips, { val: pv.val, display: countyName(countyFips) + ' (' + (pi.name || '') + ')' });
+        }
+      });
+    }
+  }
+
+  if (dataMap.size === 0) {
+    el.innerHTML = '<div style="padding:40px;text-align:center;color:#666;">No map data available.</div>';
+    return;
+  }
+
+  // Filter to continental US (state FIPS <= 56)
+  const locs = [], vals = [], texts = [];
+  dataMap.forEach((d, fips) => {
+    const sf = parseInt(fips.substring(0, 2));
+    if (sf > 56) return;
+    locs.push(fips);
+    vals.push(d.val);
+    texts.push(d.display + '<br>' + ml + ': ' + fmt(d.val, 3));
+  });
+
+  Plotly.newPlot(el, [{
+    type: 'choropleth',
+    geojson: BASE + 'us-counties-2023.json',
+    featureidkey: 'id',
+    locations: locs,
+    z: vals,
+    text: texts,
+    hoverinfo: 'text',
+    colorscale: 'YlGnBu',
+    colorbar: { title: ml, thickness: 15 },
+    marker: { line: { width: 0.2, color: '#fff' } }
+  }], {
+    geo: { scope: 'usa', projection: { type: 'albers usa' }, showlakes: false },
+    margin: { t: 10, r: 10, b: 10, l: 10 },
+    height: 550,
+    font: { family: 'Source Sans Pro, sans-serif' }
+  }, { responsive: true });
+}
+
+// ═══════════════════════════════════════
+//  REGIONAL VIEW
+// ═══════════════════════════════════════
+let regGeoWidget = null;
+
+function initRegControls() {
+  function populate() {
+    const level = document.getElementById('reg-level').value;
+    regGeoWidget = searchSelect(
+      document.getElementById('reg-geo-search'),
+      geoItems(level),
+      'Search ' + LEVEL_NAME[level] + '...',
+      (val) => loadRegional(level, val)
+    );
+  }
+  populate();
+  document.getElementById('reg-level').addEventListener('change', () => {
+    populate();
+    document.getElementById('reg-content').innerHTML = '<div class="empty"><h2>Select a Geography</h2><p>Choose a level and search for a region.</p></div>';
+  });
+}
+
+async function loadRegional(level, geoid) {
+  spin('Loading regional data...');
+  const out = document.getElementById('reg-content');
+  try {
+    const data = await fetchGz('by_geography/' + level + '/' + padGeoid(geoid, level) + '.csv.gz');
+    const geoRec = metaGeo.find(g => g.geo_aggregation_level === LEVELS[level] && String(g.geoid) === String(geoid));
+
+    out.innerHTML = '';
+
+    // Title
+    const title = document.createElement('h2');
+    title.style.cssText = 'color:var(--blue);margin-bottom:16px;';
+    title.textContent = level === 'county' ? countyName(padGeoid(geoid, level)) : (geoRec ? geoRec.name : geoid);
+    out.appendChild(title);
+
+    // Summary cards
+    if (geoRec) {
+      const cd = document.createElement('div');
+      cd.className = 'cards';
+      cd.innerHTML =
+        '<div class="card"><div class="card-label">Economic Complexity</div><div class="card-value">' + fmt(geoRec.economic_complexity_index) + '</div><div class="card-sub">' + fmtPct(geoRec.economic_complexity_percentile_score) + ' percentile</div></div>' +
+        '<div class="card"><div class="card-label">Industrial Diversity</div><div class="card-value">' + fmtInt(geoRec.industrial_diversity) + '</div></div>' +
+        '<div class="card"><div class="card-label">Strategic Index</div><div class="card-value">' + fmt(geoRec.strategic_index) + '</div><div class="card-sub">' + fmtPct(geoRec.strategic_index_percentile) + ' percentile</div></div>';
+      out.appendChild(cd);
+    }
+
+    // Enrich data with industry names
+    const enriched = data.map(r => ({
+      ...r,
+      industry_description: industryTitles.get(String(r.industry_code)) || String(r.industry_code)
+    }));
+
+    // Current Strengths
+    const strengths = enriched.filter(r => r.industry_comparative_advantage === 1).sort((a, b) => (b.location_quotient || 0) - (a.location_quotient || 0));
+    const h1 = document.createElement('div'); h1.className = 'sec-title'; h1.textContent = 'Current Strengths (' + strengths.length + ')'; out.appendChild(h1);
+    const t1 = document.createElement('div'); out.appendChild(t1);
+    makeTable(t1, [
+      { key: 'industry_description', label: 'Industry' },
+      { key: 'industry_code', label: 'Code', align: 'center' },
+      { key: 'location_quotient', label: 'LQ', align: 'right', fmt: v => fmt(v, 2) },
+      { key: 'industry_employment_share', label: 'Emp Share', align: 'right', fmt: v => v != null ? (v * 100).toFixed(3) + '%' : '\u2014' }
+    ], strengths, 'location_quotient', 'desc');
+
+    // Growth Opportunities
+    const growth = enriched.filter(r => r.industry_comparative_advantage === 0 && r.industry_feasibility_percentile_score >= 75)
+      .sort((a, b) => (b.industry_feasibility || 0) - (a.industry_feasibility || 0));
+    const h2 = document.createElement('div'); h2.className = 'sec-title'; h2.textContent = 'Growth Opportunities (' + growth.length + ')'; out.appendChild(h2);
+    const t2 = document.createElement('div'); out.appendChild(t2);
+    makeTable(t2, [
+      { key: 'industry_description', label: 'Industry' },
+      { key: 'industry_code', label: 'Code', align: 'center' },
+      { key: 'industry_feasibility', label: 'Feasibility', align: 'right', fmt: v => fmt(v, 4) },
+      { key: 'industry_feasibility_percentile_score', label: 'Feas. Pctl', align: 'right', fmt: v => fmt(v, 1) },
+      { key: 'strategic_gain', label: 'Strategic Gain', align: 'right', fmt: v => fmt(v, 4) }
+    ], growth, 'industry_feasibility', 'desc');
+
+    // Scatter: Feasibility vs Strategic Gain
+    const withFeas = enriched.filter(r => r.industry_feasibility != null && r.strategic_gain != null);
+    if (withFeas.length > 0) {
+      const st = document.createElement('div'); st.className = 'sec-title'; st.textContent = 'Feasibility vs Strategic Gain'; out.appendChild(st);
+      const cw = document.createElement('div'); cw.className = 'chart-wrap';
+      const ce = document.createElement('div'); cw.appendChild(ce); out.appendChild(cw);
+
+      const rca = withFeas.filter(r => r.industry_comparative_advantage === 1);
+      const noRca = withFeas.filter(r => r.industry_comparative_advantage !== 1);
+      Plotly.newPlot(ce, [
+        { x: noRca.map(r => r.industry_feasibility), y: noRca.map(r => r.strategic_gain),
+          text: noRca.map(r => r.industry_description), mode: 'markers', type: 'scatter',
+          name: 'No CA', marker: { color: '#a6cee3', size: 5, opacity: .5 }, hoverinfo: 'text' },
+        { x: rca.map(r => r.industry_feasibility), y: rca.map(r => r.strategic_gain),
+          text: rca.map(r => r.industry_description), mode: 'markers', type: 'scatter',
+          name: 'Comp. Advantage', marker: { color: '#1f78b4', size: 7, opacity: .7 }, hoverinfo: 'text' }
+      ], {
+        xaxis: { title: 'Industry Feasibility' }, yaxis: { title: 'Strategic Gain' },
+        margin: { t: 20, r: 20, b: 50, l: 60 }, height: 400,
+        legend: { x: 0, y: 1 },
+        font: { family: 'Source Sans Pro, sans-serif' }
+      }, { responsive: true });
+    }
+
+  } catch (e) {
+    console.error(e);
+    out.innerHTML = '<div class="empty"><h2>Error</h2><p>' + escHtml(e.message) + '</p></div>';
+  }
+  unspin();
+}
+
+// ═══════════════════════════════════════
+//  INDUSTRY SPACE
+// ═══════════════════════════════════════
+let isGeoWidget = null;
+
+function initISControls() {
+  function populate() {
+    const level = document.getElementById('is-level').value;
+    isGeoWidget = searchSelect(
+      document.getElementById('is-geo-search'),
+      geoItems(level),
+      'Highlight a ' + LEVEL_NAME[level] + '...'
+    );
+  }
+  populate();
+  document.getElementById('is-level').addEventListener('change', populate);
+  document.getElementById('is-go').addEventListener('click', loadIndustrySpace);
 }
 
 async function loadIndustrySpace() {
-  showSpinner('Building industry network...');
+  spin('Loading industry data...');
+  const out = document.getElementById('is-content');
   try {
     const level = document.getElementById('is-level').value;
-    const threshPct = parseInt(document.getElementById('is-threshold').value);
-    const levelCode = LEVEL_MAP[level];
+    const levelCode = LEVELS[level];
 
-    const nodesAll = await fetchCSV('meta/industry_space_nodes.csv');
-    const edgesAll = await fetchCSV('meta/industry_space_edges.csv');
-
-    const nodes = nodesAll.filter(r => r.geo_aggregation_level === levelCode);
-    const edges = edgesAll.filter(r => r.geo_aggregation_level === levelCode);
-
-    // Threshold edges for display
-    const sortedWeights = edges.map(e => e.weight).sort((a, b) => b - a);
-    const cutoff = sortedWeights[Math.floor(sortedWeights.length * threshPct / 100)] || 0;
-    const filteredEdges = edges.filter(e => e.weight >= cutoff);
-
-    // Use top 20% edges for layout (denser than display threshold for better structure)
-    const layoutPct = Math.max(threshPct, 20);
-    const layoutCutoff = sortedWeights[Math.floor(sortedWeights.length * layoutPct / 100)] || 0;
-    const layoutEdges = edges.filter(e => e.weight >= layoutCutoff);
-
-    // Compute force-directed layout
-    const positions = runForceLayout(nodes, layoutEdges, levelCode);
+    if (!metaIndustry) metaIndustry = await fetchCSV('meta/industry_specific.csv');
+    const nodes = metaIndustry.filter(r => r.geo_aggregation_level === levelCode);
 
     // Optional geo highlight
     let rcaSet = null;
-    const highlightGeo = isGeoWidget ? isGeoWidget.getValue() : null;
+    const highlightGeo = isGeoWidget ? isGeoWidget.val() : null;
     if (highlightGeo) {
       try {
-        const geoData = await fetchCSVGz('by_geography/' + level + '/' + padGeoid(highlightGeo, level) + '.csv.gz');
+        const geoData = await fetchGz('by_geography/' + level + '/' + padGeoid(highlightGeo, level) + '.csv.gz');
         rcaSet = new Set(geoData.filter(r => r.industry_comparative_advantage === 1).map(r => String(r.industry_code)));
-      } catch (e) { console.warn('Could not load geo data for highlight', e); }
+      } catch (e) { console.warn('Highlight geo failed:', e); }
     }
 
-    const container = document.getElementById('is-results');
-    container.innerHTML = '';
-    container.style.display = '';
-    document.getElementById('is-empty').style.display = 'none';
+    out.innerHTML = '';
 
-    // Build node map
-    const nodeMap = new Map();
-    nodes.forEach(n => nodeMap.set(String(n.industry_code), n));
+    const geoLabel = highlightGeo ? ' \u2014 ' + (level === 'county' ? countyName(padGeoid(highlightGeo, level)) : (metaGeo.find(g => g.geo_aggregation_level === levelCode && String(g.geoid) === highlightGeo) || {}).name || highlightGeo) : '';
 
-    // Edge traces using force layout positions
-    const edgeX = [];
-    const edgeY = [];
-    filteredEdges.forEach(e => {
-      const fromPos = positions.get(String(e.from));
-      const toPos = positions.get(String(e.to));
-      if (fromPos && toPos) {
-        edgeX.push(fromPos.x, toPos.x, null);
-        edgeY.push(fromPos.y, toPos.y, null);
+    // Title
+    const title = document.createElement('h2');
+    title.style.cssText = 'color:var(--blue);margin-bottom:16px;';
+    title.textContent = 'Industry Space' + geoLabel;
+    out.appendChild(title);
+
+    // Stats
+    const cd = document.createElement('div');
+    cd.className = 'cards';
+    cd.innerHTML =
+      '<div class="card"><div class="card-label">Industries</div><div class="card-value">' + fmtInt(nodes.length) + '</div></div>' +
+      (rcaSet ? '<div class="card"><div class="card-label">Comparative Advantage</div><div class="card-value">' + fmtInt(rcaSet.size) + '</div></div>' : '');
+    out.appendChild(cd);
+
+    // Complexity scatter: complexity vs ubiquity
+    const complexities = nodes.filter(n => n.industry_complexity != null);
+    if (complexities.length > 0) {
+      const st = document.createElement('div'); st.className = 'sec-title'; st.textContent = 'Industry Complexity vs Ubiquity'; out.appendChild(st);
+      const cw = document.createElement('div'); cw.className = 'chart-wrap';
+      const ce = document.createElement('div'); cw.appendChild(ce); out.appendChild(cw);
+
+      if (rcaSet) {
+        const rcaNodes = complexities.filter(n => rcaSet.has(String(n.industry_code)));
+        const otherNodes = complexities.filter(n => !rcaSet.has(String(n.industry_code)));
+        Plotly.newPlot(ce, [
+          { x: otherNodes.map(n => n.industry_ubiquity), y: otherNodes.map(n => n.industry_complexity),
+            text: otherNodes.map(n => (industryTitles.get(String(n.industry_code)) || n.industry_code)),
+            mode: 'markers', type: 'scatter', name: 'Other',
+            marker: { color: '#ccc', size: 5, opacity: .3 }, hoverinfo: 'text' },
+          { x: rcaNodes.map(n => n.industry_ubiquity), y: rcaNodes.map(n => n.industry_complexity),
+            text: rcaNodes.map(n => (industryTitles.get(String(n.industry_code)) || n.industry_code)),
+            mode: 'markers', type: 'scatter', name: 'Comp. Advantage',
+            marker: { color: '#1f78b4', size: 7, opacity: .8 }, hoverinfo: 'text' }
+        ], {
+          xaxis: { title: 'Ubiquity' }, yaxis: { title: 'Complexity' },
+          margin: { t: 20, r: 20, b: 50, l: 60 }, height: 450,
+          legend: { x: 0, y: 1 },
+          font: { family: 'Source Sans Pro, sans-serif' }
+        }, { responsive: true });
+      } else {
+        Plotly.newPlot(ce, [{
+          x: complexities.map(n => n.industry_ubiquity),
+          y: complexities.map(n => n.industry_complexity),
+          text: complexities.map(n => (industryTitles.get(String(n.industry_code)) || n.industry_code)),
+          mode: 'markers', type: 'scatter',
+          marker: { color: complexities.map(n => n.industry_complexity), colorscale: 'Plasma', size: 6, colorbar: { title: 'ICI' } },
+          hoverinfo: 'text'
+        }], {
+          xaxis: { title: 'Ubiquity' }, yaxis: { title: 'Complexity' },
+          margin: { t: 20, r: 20, b: 50, l: 60 }, height: 450,
+          font: { family: 'Source Sans Pro, sans-serif' }
+        }, { responsive: true });
       }
-    });
-
-    const edgeTrace = {
-      x: edgeX, y: edgeY,
-      mode: 'lines',
-      type: 'scatter',
-      line: { color: 'rgba(160,160,160,0.25)', width: 0.7 },
-      hoverinfo: 'none',
-      showlegend: false
-    };
-
-    // Node traces using force layout positions
-    const complexities = nodes.map(n => n.industry_complexity);
-    const ubiquities = nodes.map(n => n.industry_ubiquity);
-    const maxUbiq = Math.max(...ubiquities);
-    const sizes = ubiquities.map(u => Math.max(3, 2 + (u / maxUbiq) * 12));
-
-    let nodeColors, nodeColorbar;
-    if (rcaSet) {
-      nodeColors = nodes.map(n => rcaSet.has(String(n.industry_code)) ? CB_PAIRED[1] : '#cccccc');
-      nodeColorbar = undefined;
-    } else {
-      nodeColors = complexities;
-      nodeColorbar = { title: { text: 'ICI', font: { size: 11 } }, thickness: 15 };
     }
 
-    const nodeTrace = {
-      x: nodes.map(n => { const p = positions.get(String(n.industry_code)); return p ? p.x : 0; }),
-      y: nodes.map(n => { const p = positions.get(String(n.industry_code)); return p ? p.y : 0; }),
-      text: nodes.map(n => n.industry_description + '<br>Industry Code: ' + n.industry_code + '<br>ICI: ' + fmt(n.industry_complexity) + '<br>Ubiquity: ' + n.industry_ubiquity + '<br>Centrality: ' + fmt(n.industry_centrality, 5) + (rcaSet ? '<br>Comparative Advantage: ' + (rcaSet.has(String(n.industry_code)) ? 'Yes' : 'No') : '')),
-      mode: 'markers',
-      type: 'scatter',
-      marker: {
-        size: sizes,
-        color: nodeColors,
-        colorscale: rcaSet ? undefined : 'Plasma',
-        colorbar: nodeColorbar,
-        line: { color: 'rgba(0,0,0,0.15)', width: 0.5 },
-        opacity: rcaSet ? nodes.map(n => rcaSet.has(String(n.industry_code)) ? 1 : 0.12) : 0.85
-      },
-      hoverinfo: 'text',
-      showlegend: false
-    };
-
-    // Add legend traces when highlighting
-    const traces = [edgeTrace, nodeTrace];
-    if (rcaSet) {
-      traces.push({
-        x: [null], y: [null], mode: 'markers', type: 'scatter',
-        marker: { size: 10, color: CB_PAIRED[1] },
-        name: 'Comparative Advantage (Strength)', showlegend: true
-      });
-      traces.push({
-        x: [null], y: [null], mode: 'markers', type: 'scatter',
-        marker: { size: 10, color: '#cccccc' },
-        name: 'No Comparative Advantage', showlegend: true
-      });
+    // Complexity histogram
+    const cvals = nodes.map(n => n.industry_complexity).filter(v => v != null);
+    if (cvals.length > 1) {
+      const ht = document.createElement('div'); ht.className = 'sec-title'; ht.textContent = 'Industry Complexity Distribution'; out.appendChild(ht);
+      const hw = document.createElement('div'); hw.className = 'chart-wrap';
+      const he = document.createElement('div'); hw.appendChild(he); out.appendChild(hw);
+      Plotly.newPlot(he, [{ x: cvals, type: 'histogram', marker: { color: '#1f78b4' }, nbinsx: 40 }], {
+        xaxis: { title: 'Industry Complexity' }, yaxis: { title: 'Count' },
+        margin: { t: 20, r: 20, b: 50, l: 50 }, height: 300,
+        font: { family: 'Source Sans Pro, sans-serif' }
+      }, { responsive: true });
     }
 
-    const chtitle = document.createElement('div'); chtitle.className = 'section-title';
-    chtitle.textContent = 'Industry Space Network' + (highlightGeo ? ' \u2014 ' + getGeoName(highlightGeo, level) : '');
-    container.appendChild(chtitle);
+    // Table
+    const tt = document.createElement('div'); tt.className = 'sec-title'; tt.textContent = 'Industries'; out.appendChild(tt);
+    const tw = document.createElement('div'); out.appendChild(tw);
+    const tableRows = nodes.map(n => ({
+      code: n.industry_code,
+      name: industryTitles.get(String(n.industry_code)) || String(n.industry_code),
+      complexity: n.industry_complexity,
+      ubiquity: n.industry_ubiquity,
+      rca: rcaSet ? (rcaSet.has(String(n.industry_code)) ? '\u2713' : '') : ''
+    }));
+    const cols = [
+      { key: 'code', label: 'Code', align: 'center' },
+      { key: 'name', label: 'Industry' },
+      { key: 'complexity', label: 'Complexity', align: 'right', fmt: v => fmt(v) },
+      { key: 'ubiquity', label: 'Ubiquity', align: 'right', fmt: v => fmtInt(v) }
+    ];
+    if (rcaSet) cols.push({ key: 'rca', label: 'CA', align: 'center' });
+    makeTable(tw, cols, tableRows, 'complexity', 'desc');
 
-    const chartDiv = document.createElement('div'); chartDiv.className = 'chart-container';
-    const plotEl = document.createElement('div'); plotEl.id = 'is-network';
-    chartDiv.appendChild(plotEl); container.appendChild(chartDiv);
-
-    Plotly.newPlot(plotEl, traces, {
-      xaxis: { showgrid: false, zeroline: false, showticklabels: false, title: '' },
-      yaxis: { showgrid: false, zeroline: false, showticklabels: false, title: '' },
-      images: rmiLogoImages(),
-      margin: { t: 20, r: 20, b: 20, l: 20 },
-      height: chartH(650),
-      hovermode: 'closest',
-      legend: { x: 0.01, y: 0.99, bgcolor: 'rgba(255,255,255,0.8)' },
-      font: { family: 'Source Sans Pro, Roboto, sans-serif' },
-      dragmode: 'pan'
-    }, { responsive: true, scrollZoom: true });
-
-    chartDiv.appendChild(buildExportBar(plotEl, 'industry_space_network', () => ({
-      rows: nodes.map(n => ({
-        industry_code: n.industry_code,
-        industry_description: n.industry_description,
-        complexity: n.industry_complexity,
-        centrality: n.industry_centrality,
-        ubiquity: n.industry_ubiquity,
-        comparative_advantage: rcaSet ? (rcaSet.has(String(n.industry_code)) ? 1 : 0) : ''
-      })),
-      columns: [
-        { key: 'industry_code', label: 'Industry Code' },
-        { key: 'industry_description', label: 'Industry' },
-        { key: 'complexity', label: 'Industry Complexity' },
-        { key: 'centrality', label: 'Centrality' },
-        { key: 'ubiquity', label: 'Ubiquity' },
-        { key: 'comparative_advantage', label: 'Comparative Advantage' }
-      ]
-    })));
-
-    // Industry Complexity Distribution
-    const chtitle2 = document.createElement('div'); chtitle2.className = 'section-title';
-    chtitle2.textContent = 'Industry Complexity Distribution';
-    container.appendChild(chtitle2);
-
-    const chartDiv2 = document.createElement('div'); chartDiv2.className = 'chart-container';
-    const plotEl2 = document.createElement('div'); plotEl2.id = 'is-hist';
-    chartDiv2.appendChild(plotEl2); container.appendChild(chartDiv2);
-
-    Plotly.newPlot(plotEl2, [{
-      x: complexities.filter(v => v != null),
-      type: 'histogram',
-      marker: { color: CB_PAIRED[1], line: { color: CB_PAIRED[0], width: 1 } },
-      nbinsx: 40
-    }], {
-      xaxis: { title: 'Industry Complexity' },
-      yaxis: { title: 'Count' },
-      images: rmiLogoImages(),
-      margin: { t: 20, r: 20, b: 50, l: 50 },
-      height: chartH(300),
-      font: { family: 'Source Sans Pro, Roboto, sans-serif' }
-    }, { responsive: true });
-
-    chartDiv2.appendChild(buildExportBar(plotEl2, 'industry_complexity_distribution', null));
-
-    // Stats cards
-    const statDiv = document.createElement('div');
-    statDiv.className = 'cards';
-    statDiv.innerHTML =
-      '<div class="card"><div class="card-label">Industries (Nodes)</div><div class="card-value">' + fmtInt(nodes.length) + '</div></div>' +
-      '<div class="card"><div class="card-label">Connections Shown</div><div class="card-value">' + fmtInt(filteredEdges.length) + '</div><div class="card-sub">of ' + fmtInt(edges.length) + ' total (top ' + threshPct + '%)</div></div>' +
-      '<div class="card"><div class="card-label">Weight Cutoff</div><div class="card-value">' + fmt(cutoff, 4) + '</div></div>';
-    container.insertBefore(statDiv, container.children[1]);
-
-  } catch (err) {
-    console.error(err);
-    const container = document.getElementById('is-results');
-    container.innerHTML = '<div class="empty-state"><h2>Error</h2><p>' + err.message + '</p></div>';
-    container.style.display = '';
-    document.getElementById('is-empty').style.display = 'none';
+  } catch (e) {
+    console.error(e);
+    out.innerHTML = '<div class="empty"><h2>Error</h2><p>' + escHtml(e.message) + '</p></div>';
   }
-  hideSpinner();
+  unspin();
 }
 
-// ════════════════════════════════════════════
+// ═══════════════════════════════════════
 //  INIT
-// ════════════════════════════════════════════
-// ════════════════════════════════════════════
-//  URL HASH ROUTING
-// ════════════════════════════════════════════
-// Formats:
-//   #/regional/{level}/{geoid}
-//   #/national/{level}/{mode}/{metricOrIndustry}
-//   #/industry-space/{level}
-
-function updateHash(tab, params) {
-  const parts = [tab, ...params].map(encodeURIComponent);
-  history.replaceState(null, '', '#/' + parts.join('/'));
-}
-
-function parseHash() {
-  const hash = window.location.hash;
-  if (!hash || !hash.startsWith('#/')) return null;
-  const parts = hash.slice(2).split('/').map(decodeURIComponent);
-  return { tab: parts[0], params: parts.slice(1) };
-}
-
-async function applyHash() {
-  const parsed = parseHash();
-  if (!parsed) return;
-  const { tab, params } = parsed;
-
-  if (tab === 'regional' && params.length >= 2) {
-    const [level, geoid] = params;
-    // Switch tab
-    document.querySelector('[data-tab="regional"]').click();
-    document.getElementById('reg-level').value = level;
-    populateRegGeoList();
-    const paddedGeoid = padGeoid(geoid, level);
-    const geoName = level === 'county' ? getCountyDisplayName(paddedGeoid) : getGeoName(geoid, level);
-    if (regGeoWidget) regGeoWidget.setValue(paddedGeoid, geoName);
-    regSelectedGeo = paddedGeoid;
-    await loadRegional(level, paddedGeoid);
-  } else if (tab === 'national' && params.length >= 3) {
-    const [level, mode, metricOrIndustry] = params;
-    document.querySelector('[data-tab="national"]').click();
-    document.getElementById('nat-level').value = level;
-    updateNatStateFilter();
-    document.getElementById('nat-mode').value = mode;
-    document.getElementById('nat-mode').dispatchEvent(new Event('change'));
-    if (mode === 'industry') {
-      if (natIndWidget && metricOrIndustry) {
-        const desc = industryTitles ? industryTitles.get(metricOrIndustry) : metricOrIndustry;
-        natIndWidget.setValue(metricOrIndustry, metricOrIndustry + ' - ' + (desc || ''));
-      }
-      if (params[3]) document.getElementById('nat-metric').value = params[3];
-    } else {
-      if (metricOrIndustry) document.getElementById('nat-geo-metric').value = metricOrIndustry;
-    }
-    await loadNational();
-  } else if (tab === 'industry-space') {
-    document.querySelector('[data-tab="industry-space"]').click();
-    if (params[0]) document.getElementById('is-level').value = params[0];
-    await loadIndustrySpace();
-  }
-}
-
-// Update hash when navigating (hook into existing functions)
-const _origLoadRegional = loadRegional;
-loadRegional = async function(level, geoid) {
-  updateHash('regional', [level, geoid]);
-  return _origLoadRegional(level, geoid);
-};
-
-const _origLoadNational = loadNational;
-loadNational = async function() {
-  const level = document.getElementById('nat-level').value;
-  const mode = document.getElementById('nat-mode').value;
-  if (mode === 'industry') {
-    const indCode = natIndWidget ? natIndWidget.getValue() : '';
-    const metric = document.getElementById('nat-metric').value;
-    updateHash('national', [level, mode, indCode || '', metric]);
-  } else {
-    const metric = document.getElementById('nat-geo-metric').value;
-    updateHash('national', [level, mode, metric]);
-  }
-  return _origLoadNational();
-};
-
-const _origLoadIndustrySpace = loadIndustrySpace;
-loadIndustrySpace = async function() {
-  const level = document.getElementById('is-level').value;
-  updateHash('industry-space', [level]);
-  return _origLoadIndustrySpace();
-};
-
-// ════════════════════════════════════════════
-//  INIT
-// ════════════════════════════════════════════
+// ═══════════════════════════════════════
 (async function init() {
-  showSpinner('Loading map boundaries...');
-  setLoadProgress(0);
-  // Pre-fetch GeoJSON in parallel with metadata
-  const geoPromise = fetchGeoJSON().catch(e => console.warn('GeoJSON prefetch failed:', e));
-  setLoadProgress(10);
-
-  setLoadStatus('Loading metadata...');
-  try { await ensureMeta(); } catch (err) { console.error('Metadata load failed:', err); }
-  setLoadProgress(40);
-
-  setLoadStatus('Preparing Regional View...');
-  try { await initRegional(); } catch (err) { console.error('Regional init failed:', err); }
-  setLoadProgress(60);
-
-  setLoadStatus('Preparing National View...');
-  try { await initNational(); } catch (err) { console.error('National init failed:', err); }
-  setLoadProgress(75);
-
-  setLoadStatus('Preparing Industry Space...');
-  try { await initIndustrySpace(); } catch (err) { console.error('Industry Space init failed:', err); }
-  setLoadProgress(90);
-
-  // Wait for GeoJSON if still loading
-  setLoadStatus('Finalizing...');
-  await geoPromise;
-  setLoadProgress(100);
-
-  // Apply deep link if present
-  try { await applyHash(); } catch (err) { console.error('Hash routing failed:', err); }
-  hideSpinner();
+  spin('Loading metadata...');
+  try {
+    await loadMeta();
+    initNatControls();
+    initRegControls();
+    initISControls();
+    // Auto-load national with default industry
+    await loadNational();
+  } catch (e) {
+    console.error('Init failed:', e);
+    document.getElementById('nat-content').innerHTML = '<div class="empty"><h2>Failed to Load</h2><p>' + escHtml(e.message) + '</p></div>';
+  }
+  unspin();
 })();
 </script>
 </body>
