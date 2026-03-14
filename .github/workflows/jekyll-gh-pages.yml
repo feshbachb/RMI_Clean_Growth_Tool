@@ -36,7 +36,10 @@ jobs:
         run: |
           Rscript -e '
             install.packages("pak", repos = "https://cloud.r-project.org")
-            pak::pak(c("shinylive", "bslib", "shiny", "httpuv"))
+            pak::pak(c(
+              "shinylive", "bslib", "shiny", "httpuv",
+              "plotly", "DT", "visNetwork", "dplyr", "jsonlite"
+            ))
           '
 
       - name: Export Shiny app to docs/shiny/
