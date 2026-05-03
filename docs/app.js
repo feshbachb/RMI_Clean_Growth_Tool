@@ -88,13 +88,42 @@
   };
 
   /* ---- fetcher ------------------------------------------------------------ */
+
+  const FETCH_TIMEOUT_MS = 15000;
+  const FETCH_RETRIES = 2;
+
+  async function fetchWithTimeout(url, options) {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort('timeout'), FETCH_TIMEOUT_MS);
+    try {
+      return await fetch(url, Object.assign({ cache: 'force-cache', signal: controller.signal }, options || {}));
+    } finally {
+      window.clearTimeout(timer);
+    }
+  }
+
+  async function fetchWithRetry(url, parser, label) {
+    let lastErr;
+    for (let attempt = 1; attempt <= FETCH_RETRIES + 1; attempt += 1) {
+      try {
+        const res = await fetchWithTimeout(url);
+        if (!res.ok) throw new Error('HTTP ' + res.status + ' for ' + url);
+        return await parser(res);
+      } catch (err) {
+        lastErr = err;
+        if (attempt > FETCH_RETRIES) break;
+        setBootDetail('Retrying ' + (label || url) + ' (' + attempt + '/' + FETCH_RETRIES + ')...');
+        await new Promise(r => window.setTimeout(r, 450 * attempt));
+      }
+    }
+    throw new Error('Failed to load ' + (label || url) + ' after retries: ' + (lastErr && lastErr.message ? lastErr.message : lastErr));
+  }
+
   async function fetchJSON(url) {
     LoadingTracker.startRequest(url);
     return TIME('fetch:' + url, async () => {
       try {
-      const res = await fetch(url, { cache: 'force-cache' });
-      if (!res.ok) throw new Error('HTTP ' + res.status + ' for ' + url);
-      return res.json();
+      return fetchWithRetry(url, (res) => res.json(), url);
       } finally { LoadingTracker.endRequest(); }
     });
   }
@@ -104,10 +133,10 @@
     LoadingTracker.startRequest(url);
     return TIME('fetch:' + url, async () => {
       try {
-      const res = await fetch(url, { cache: 'force-cache' });
-      if (!res.ok) throw new Error('HTTP ' + res.status + ' for ' + url);
-      const text = await res.text();
-      return d3.csvParse(text);
+      return fetchWithRetry(url, async (res) => {
+        const text = await res.text();
+        return d3.csvParse(text);
+      }, url);
       } finally { LoadingTracker.endRequest(); }
     });
   }
@@ -118,9 +147,7 @@
     LoadingTracker.startRequest(url);
     return TIME('fetch:' + url, async () => {
       try {
-      const res = await fetch(url, { cache: 'force-cache' });
-      if (!res.ok) throw new Error('HTTP ' + res.status + ' for ' + url);
-      const buf = await res.arrayBuffer();
+      const buf = await fetchWithRetry(url, (res) => res.arrayBuffer(), url);
       let text;
       try {
         text = pako.inflate(new Uint8Array(buf), { to: 'string' });
@@ -137,9 +164,7 @@
     LoadingTracker.startRequest(url);
     return TIME('fetch:' + url, async () => {
       try {
-      const res = await fetch(url, { cache: 'force-cache' });
-      if (!res.ok) throw new Error('HTTP ' + res.status + ' for ' + url);
-      const buf = await res.arrayBuffer();
+      const buf = await fetchWithRetry(url, (res) => res.arrayBuffer(), url);
       let text;
       try {
         text = pako.inflate(new Uint8Array(buf), { to: 'string' });
@@ -227,9 +252,23 @@
   }
 
 
+
+  function hydrateBrandLogo() {
+    const logo = document.querySelector('.brand-logo');
+    if (!logo) return;
+    const candidates = ['assets/rmi-logo.svg', './assets/rmi-logo.svg', '/RMI_Clean_Growth_Tool/assets/rmi-logo.svg'];
+    let idx = 0;
+    logo.addEventListener('error', () => {
+      idx += 1;
+      if (idx < candidates.length) logo.src = candidates[idx];
+    });
+    if (!logo.getAttribute('src')) logo.src = candidates[0];
+  }
+
   /* ---- boot --------------------------------------------------------------- */
   async function boot() {
     const bootStart = performance.now();
+    hydrateBrandLogo();
     const bootFailSafe = window.setTimeout(() => {
       const boot = document.getElementById('boot-screen');
       const main = document.getElementById('view');
@@ -436,7 +475,14 @@
         'matrix M̃. Feasibility (industry density) is computed from the proximity matrix.'),
       el('h3', null, 'Build'),
       el('p', null, 'Pipeline: ', el('code', null, cfg.pipeline_id)),
-      el('p', null, 'Built: ', cfg.build_time)
+      el('p', null, 'Built: ', cfg.build_time),
+      el('h3', null, 'Dashboard audit + overhaul plan'),
+      el('ul', null,
+        el('li', null, 'Existing functionality already covers national choropleths, regional peer comparison, and deferred heavy analytics loading.'),
+        el('li', null, 'Current gaps are mostly around resilience, discoverability, and data-story orchestration rather than missing raw data feeds.'),
+        el('li', null, 'Proposed overhaul: guided workflows, cross-view linked brushing, scenario builder, and prioritized opportunity pipelines using all available feasibility + concentration + complexity measures.'),
+        el('li', null, 'Technical upgrade path: typed data contracts, view-level health telemetry, deterministic caching, and precomputed narrative summaries per geography.')
+      )
     ));
   }
 
