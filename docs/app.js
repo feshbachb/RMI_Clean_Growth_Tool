@@ -137,6 +137,28 @@
     tooltip.style.top = yy + 'px';
   }
   function ttHide() { tooltip.hidden = true; }
+  function escapeHtml(value) {
+    return String(value == null ? '' : value)
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#39;');
+  }
+  function makeClickableRow(onActivate, opts, ...cells) {
+    const row = el('tr', Object.assign({
+      role: 'button',
+      tabindex: '0',
+      onclick: onActivate,
+      onkeydown: (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onActivate();
+        }
+      }
+    }, opts || {}), ...cells);
+    return row;
+  }
 
 
   /* ---- boot --------------------------------------------------------------- */
@@ -144,8 +166,9 @@
     const bootStart = performance.now();
     try {
       setBootDetail('Fetching bootstrap bundle...');
+      const buildVersion = document.getElementById('footer-pipeline-id')?.textContent || 'current';
       const bs = await PERF('boot:bootstrap', () =>
-        fetchJSON('data/bootstrap.json?v=' + Date.now()));
+        fetchJSON('data/bootstrap.json?v=' + encodeURIComponent(buildVersion)));
       State.bootstrap = bs;
       State.config = bs.config;
       State.geographies = bs.geographies;
@@ -429,8 +452,8 @@
           d.properties.state_name || d.properties.cbsa_name ||
           d.properties.csa_name || d.properties.commuting_zone_name ||
           d.properties[idProp];
-        tt('<strong>' + (name || '—') + '</strong><br>' +
-          'Value: ' + (v == null ? '—' : fmtScore(v)), event);
+        tt('<strong>' + escapeHtml(name || '—') + '</strong><br>' +
+          'Value: ' + escapeHtml(v == null ? '—' : fmtScore(v)), event);
       })
       .on('mouseleave', ttHide)
       .on('click', (event, d) => {
@@ -710,6 +733,8 @@
       style: { marginTop: '12px' } });
     sec.appendChild(results);
     v.appendChild(sec);
+    let searchIndex = null;
+    let searchDebounce = null;
 
     function nameOf(level, row) {
       return row.county_name || row.state_name || row.cbsa_name ||
@@ -723,9 +748,9 @@
       const dim = State.geographies[level] || [];
       const tbody = el('tbody');
       dim.slice(0, 200).forEach(row => {
-        tbody.appendChild(el('tr', {
-          onclick: () => navTo('#/regional/' + level + '/' + idOf(level, row))
-        },
+        tbody.appendChild(makeClickableRow(
+          () => navTo('#/regional/' + level + '/' + idOf(level, row)),
+          { 'aria-label': 'Open ' + nameOf(level, row) + ' (' + idOf(level, row) + ')' },
           el('td', null, nameOf(level, row)),
           el('td', { class: 'num' }, idOf(level, row)),
           el('td', { class: 'num' }, fmtScore(row.economic_complexity_index))));
@@ -737,27 +762,38 @@
         tbody));
     }
 
-    function doSearch() {
-      const q = search.value.trim().toLowerCase();
-      if (!q) { results.innerHTML = ''; return; }
-      const rows = [];
+    function buildSearchIndex() {
+      if (searchIndex) return searchIndex;
+      const idx = [];
       State.config.geographic_levels.forEach(L => {
         const dim = State.geographies[L.key] || [];
         dim.forEach(row => {
           const id = idOf(L.key, row);
           const name = nameOf(L.key, row);
-          if ((id && id.toLowerCase().includes(q)) ||
-              (name && name.toLowerCase().includes(q))) {
-            rows.push({ level: L.key, level_name: L.display_name, id, name,
-              eci: row.economic_complexity_index });
-          }
+          idx.push({
+            level: L.key,
+            level_name: L.display_name,
+            id,
+            name,
+            eci: row.economic_complexity_index,
+            _search: ((id || '') + ' ' + (name || '')).toLowerCase()
+          });
         });
       });
+      searchIndex = idx;
+      return idx;
+    }
+
+    function doSearch() {
+      const q = search.value.trim().toLowerCase();
+      if (!q) { results.innerHTML = ''; return; }
+      const rows = buildSearchIndex().filter(r => r._search.includes(q));
       const top = rows.slice(0, 200);
       const tbody = el('tbody');
       top.forEach(r => {
-        tbody.appendChild(el('tr',
-          { onclick: () => navTo('#/regional/' + r.level + '/' + r.id) },
+        tbody.appendChild(makeClickableRow(
+          () => navTo('#/regional/' + r.level + '/' + r.id),
+          { 'aria-label': 'Open ' + r.name + ' (' + r.id + ') at ' + r.level_name + ' level' },
           el('td', null, r.name),
           el('td', null, r.level_name),
           el('td', { class: 'num' }, r.id),
@@ -770,7 +806,10 @@
           el('th', null, 'ID'), el('th', null, 'ECI'))),
         tbody));
     }
-    search.addEventListener('input', doSearch);
+    search.addEventListener('input', () => {
+      if (searchDebounce) clearTimeout(searchDebounce);
+      searchDebounce = setTimeout(doSearch, 200);
+    });
   }
 
   /* ---- regional detail (specific geography) ------------------------------- */
@@ -1076,4 +1115,3 @@
   /* ---- start ------------------------------------------------------------- */
   document.addEventListener('DOMContentLoaded', boot);
 })();
-
