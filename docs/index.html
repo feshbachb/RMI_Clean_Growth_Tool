@@ -29,6 +29,9 @@
     <a href="#/about" data-route="about">About</a>
   </nav>
 </header>
+<div id="global-loader" class="global-loader" hidden>
+  <div class="global-loader-bar" id="global-loader-bar"></div>
+</div>
 <main id="main-content" class="app" tabindex="-1">
   <div id="boot-screen" class="boot-screen">
     <div class="boot-card">
@@ -36,6 +39,10 @@
       <div class="boot-text" aria-live="polite" aria-atomic="true">
         <div class="boot-title">Loading Clean Growth Tool</div>
         <div class="boot-detail" id="boot-detail">Fetching bootstrap bundle...</div>
+        <div class="boot-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="5" aria-label="Application loading progress">
+          <div class="boot-progress-bar" id="boot-progress-bar" style="width:5%"></div>
+        </div>
+        <div class="boot-progress-text" id="boot-progress-text">5%</div>
       </div>
     </div>
   </div>

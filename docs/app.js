@@ -50,29 +50,74 @@
     }
   }
 
+
+  const LoadingTracker = {
+    active: 0,
+    bootProgress: 5,
+    setBootProgress(value, detail) {
+      this.bootProgress = Math.max(this.bootProgress, Math.min(100, value));
+      const bar = document.getElementById('boot-progress-bar');
+      const txt = document.getElementById('boot-progress-text');
+      const wrap = document.querySelector('.boot-progress');
+      if (bar) bar.style.width = this.bootProgress + '%';
+      if (txt) txt.textContent = Math.round(this.bootProgress) + '%';
+      if (wrap) wrap.setAttribute('aria-valuenow', String(Math.round(this.bootProgress)));
+      if (detail) setBootDetail(detail);
+    },
+    startRequest(label) {
+      this.active += 1;
+      this.renderGlobal();
+    },
+    endRequest() {
+      this.active = Math.max(0, this.active - 1);
+      this.renderGlobal();
+    },
+    renderGlobal() {
+      const wrap = document.getElementById('global-loader');
+      const bar = document.getElementById('global-loader-bar');
+      if (!wrap || !bar) return;
+      if (this.active <= 0) {
+        bar.style.width = '100%';
+        window.setTimeout(() => { wrap.hidden = true; bar.style.width = '0%'; }, 120);
+        return;
+      }
+      wrap.hidden = false;
+      const pct = Math.min(92, 20 + this.active * 18);
+      bar.style.width = pct + '%';
+    }
+  };
+
   /* ---- fetcher ------------------------------------------------------------ */
   async function fetchJSON(url) {
+    LoadingTracker.startRequest(url);
     return TIME('fetch:' + url, async () => {
+      try {
       const res = await fetch(url, { cache: 'force-cache' });
       if (!res.ok) throw new Error('HTTP ' + res.status + ' for ' + url);
       return res.json();
+      } finally { LoadingTracker.endRequest(); }
     });
   }
 
   // Plain CSV (UTF-8); GitHub Pages handles HTTP gzip transparently.
   async function fetchCSV(url) {
+    LoadingTracker.startRequest(url);
     return TIME('fetch:' + url, async () => {
+      try {
       const res = await fetch(url, { cache: 'force-cache' });
       if (!res.ok) throw new Error('HTTP ' + res.status + ' for ' + url);
       const text = await res.text();
       return d3.csvParse(text);
+      } finally { LoadingTracker.endRequest(); }
     });
   }
 
   // .csv.gz files (peer geography, industry space edges, colocation) — these
   // are double-served as binary gzip; we decompress with pako client-side.
   async function fetchCSVGZ(url) {
+    LoadingTracker.startRequest(url);
     return TIME('fetch:' + url, async () => {
+      try {
       const res = await fetch(url, { cache: 'force-cache' });
       if (!res.ok) throw new Error('HTTP ' + res.status + ' for ' + url);
       const buf = await res.arrayBuffer();
@@ -84,11 +129,14 @@
         text = new TextDecoder().decode(buf);
       }
       return d3.csvParse(text);
+      } finally { LoadingTracker.endRequest(); }
     });
   }
 
   async function fetchGeoJSONGZ(url) {
+    LoadingTracker.startRequest(url);
     return TIME('fetch:' + url, async () => {
+      try {
       const res = await fetch(url, { cache: 'force-cache' });
       if (!res.ok) throw new Error('HTTP ' + res.status + ' for ' + url);
       const buf = await res.arrayBuffer();
@@ -99,7 +147,24 @@
         text = new TextDecoder().decode(buf);
       }
       return JSON.parse(text);
+      } finally { LoadingTracker.endRequest(); }
     });
+  }
+
+
+
+  function memoizedRequest(key, loader) {
+    if (State.cacheRequests[key]) return State.cacheRequests[key];
+    const req = Promise.resolve().then(loader).finally(() => {
+      delete State.cacheRequests[key];
+    });
+    State.cacheRequests[key] = req;
+    return req;
+  }
+
+  function idle(cb, timeout) {
+    if (window.requestIdleCallback) return window.requestIdleCallback(cb, { timeout: timeout || 800 });
+    return window.setTimeout(cb, 1);
   }
 
   /* ---- state -------------------------------------------------------------- */
@@ -116,6 +181,7 @@
     cacheMaps: {},
     cacheFactByGeography: {},
     cacheFactByIndustry: {},
+    cacheRequests: {},
     // ui state
     currentLevel: 'cz',
     currentMetric: 'industry_feasibility',
@@ -165,7 +231,7 @@
   async function boot() {
     const bootStart = performance.now();
     try {
-      setBootDetail('Fetching bootstrap bundle...');
+      LoadingTracker.setBootProgress(10, 'Fetching bootstrap bundle...');
       const buildVersion = document.getElementById('footer-pipeline-id')?.textContent || 'current';
       const bs = await PERF('boot:bootstrap', () =>
         fetchJSON('data/bootstrap.json?v=' + encodeURIComponent(buildVersion)));
@@ -176,6 +242,7 @@
       State.energyTechCrosswalk = bs.energy_tech_crosswalk;
       State.energyTechCategories = bs.energy_tech_categories;
       State.diagnostics = bs.diagnostics;
+      LoadingTracker.setBootProgress(45, 'Bootstrap fetched. Building indexes...');
 
       // Build helper indexes
       State.industriesByCode = {};
@@ -188,7 +255,7 @@
         State.techByKey[k] = p;
       });
 
-      setBootDetail('Bootstrap ready (' +
+      LoadingTracker.setBootProgress(72, 'Bootstrap ready (' +
         Object.keys(State.geographies).length + ' geographic levels, ' +
         (State.industries || []).length + ' industries, ' +
         (State.energyTechCategories || []).length + ' tech categories)');
@@ -202,7 +269,21 @@
 
       window.addEventListener('hashchange', router);
       router();
+      LoadingTracker.setBootProgress(88, 'Rendering initial view...');
 
+      // Warm likely-first data in the background without blocking first paint.
+      idle(() => {
+        const lvl = State.currentLevel || 'cz';
+        Promise.allSettled([
+          loadGeoJSON(lvl),
+          loadEcMap(lvl),
+          loadMap(lvl, 'industry_feasibility', 'percentile')
+        ]).then(() => {
+          console.log('[warm] primed initial national assets for', lvl);
+        });
+      }, 1200);
+
+      LoadingTracker.setBootProgress(100, 'Ready.');
       const dt = (performance.now() - bootStart).toFixed(0);
       console.log('[boot] complete in ' + dt + ' ms');
     } catch (err) {
@@ -360,8 +441,8 @@
   async function loadGeoJSON(level) {
     if (State.cacheGeoJSON[level]) return State.cacheGeoJSON[level];
     setBootDetail('Loading ' + level + ' map...');
-    const gj = await PERF('geojson:' + level, () =>
-      fetchGeoJSONGZ('data/geo/' + level + '.geojson.gz'));
+    const gj = await memoizedRequest('geojson:' + level, () => PERF('geojson:' + level, () =>
+      fetchGeoJSONGZ('data/geo/' + level + '.geojson.gz')));
     State.cacheGeoJSON[level] = gj;
     return gj;
   }
@@ -369,8 +450,8 @@
   async function loadMap(level, metric, sub) {
     const fname = level + '_' + metric + '_' + sub + '.json';
     if (State.cacheMaps[fname]) return State.cacheMaps[fname];
-    const data = await PERF('map:' + fname, () =>
-      fetchJSON('data/maps/' + fname));
+    const data = await memoizedRequest('map:' + fname, () => PERF('map:' + fname, () =>
+      fetchJSON('data/maps/' + fname)));
     State.cacheMaps[fname] = data;
     return data;
   }
@@ -378,8 +459,8 @@
   async function loadEcMap(level) {
     const fname = level + '_economic_complexity.json';
     if (State.cacheMaps[fname]) return State.cacheMaps[fname];
-    const data = await PERF('map:' + fname, () =>
-      fetchJSON('data/maps/' + fname));
+    const data = await memoizedRequest('map:' + fname, () => PERF('map:' + fname, () =>
+      fetchJSON('data/maps/' + fname)));
     State.cacheMaps[fname] = data;
     return data;
   }
@@ -616,6 +697,7 @@
 
   async function drawNational() {
     const level = State.currentLevel;
+    const drawToken = (State._drawToken = (State._drawToken || 0) + 1);
     const metric = State.currentMetric;
     const sub = State.currentSubmetric;
     const sel = State.currentSelector;
@@ -624,6 +706,7 @@
         loadGeoJSON(level),
         resolveMap(level, metric, sub, sel),
       ]);
+      if (drawToken !== State._drawToken) return;
       const svgEl = document.getElementById('nat-choro');
       const scale = renderChoropleth(svgEl, gj, valMap, level,
         State.config.palette.sequential_7,
@@ -632,6 +715,7 @@
 
       // Scatter: ECI percentile (x) vs map value (y)
       const ec = await loadEcMap(level);
+      if (drawToken !== State._drawToken) return;
       drawNationalScatter(ec, valMap, level);
     } catch (err) {
       console.error(err);
