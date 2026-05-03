@@ -13,6 +13,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
 </head>
 <body>
+<a href="#main-content" class="skip-link">Skip to main content</a>
 <header class="site-header">
   <div class="brand">
     <div class="brand-mark">RMI</div>
@@ -28,11 +29,11 @@
     <a href="#/about" data-route="about">About</a>
   </nav>
 </header>
-<main id="app" class="app">
+<main id="main-content" class="app" tabindex="-1">
   <div id="boot-screen" class="boot-screen">
     <div class="boot-card">
       <div class="boot-spinner"></div>
-      <div class="boot-text">
+      <div class="boot-text" aria-live="polite" aria-atomic="true">
         <div class="boot-title">Loading Clean Growth Tool</div>
         <div class="boot-detail" id="boot-detail">Fetching bootstrap bundle...</div>
       </div>
@@ -50,8 +51,7 @@
     <a href="https://github.com/bsf-rmi/RMI_Clean_Growth_Tool/issues/new" target="_blank" rel="noopener">Report an issue</a>
   </div>
 </footer>
-<div id="tooltip" class="tooltip" hidden></div>
+<div id="tooltip" class="tooltip" hidden role="status" aria-live="polite"></div>
 <script src="app.js?v=pipeline_20260427_185134"></script>
 </body>
 </html>
-
