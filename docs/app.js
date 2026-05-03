@@ -230,6 +230,15 @@
   /* ---- boot --------------------------------------------------------------- */
   async function boot() {
     const bootStart = performance.now();
+    const bootFailSafe = window.setTimeout(() => {
+      const boot = document.getElementById('boot-screen');
+      const main = document.getElementById('view');
+      if (boot && !boot.hidden) {
+        console.warn('[boot] fail-safe: forcing shell visible after 20s');
+        boot.hidden = true;
+        if (main) main.hidden = false;
+      }
+    }, 20000);
     try {
       LoadingTracker.setBootProgress(10, 'Fetching bootstrap bundle...');
       const buildVersion = document.getElementById('footer-pipeline-id')?.textContent || 'current';
@@ -237,11 +246,11 @@
         fetchJSON('data/bootstrap.json?v=' + encodeURIComponent(buildVersion)));
       State.bootstrap = bs;
       State.config = bs.config;
-      State.geographies = bs.geographies;
-      State.industries = bs.industries;
-      State.energyTechCrosswalk = bs.energy_tech_crosswalk;
-      State.energyTechCategories = bs.energy_tech_categories;
-      State.diagnostics = bs.diagnostics;
+      State.geographies = bs.geographies || {};
+      State.industries = bs.industries || [];
+      State.energyTechCrosswalk = bs.energy_tech_crosswalk || [];
+      State.energyTechCategories = bs.energy_tech_categories || [];
+      State.diagnostics = bs.diagnostics || [];
       LoadingTracker.setBootProgress(45, 'Bootstrap fetched. Building indexes...');
 
       // Build helper indexes
@@ -285,9 +294,12 @@
 
       LoadingTracker.setBootProgress(100, 'Ready.');
       const dt = (performance.now() - bootStart).toFixed(0);
+      window.clearTimeout(bootFailSafe);
       console.log('[boot] complete in ' + dt + ' ms');
     } catch (err) {
       console.error('[boot] failed', err);
+      window.clearTimeout(bootFailSafe);
+      document.getElementById('view').hidden = false;
       showBootError(err);
     }
   }
@@ -636,7 +648,9 @@
     });
     if (State.energyTechCategories && State.energyTechCategories.length) {
       const first = State.energyTechCategories[0];
-      techSel.value = first.energy_tech_category + ' | ' + first.energy_tech_subcategory;
+      const firstKey = first.energy_tech_category + ' | ' + first.energy_tech_subcategory;
+      techSel.value = firstKey;
+      if (!State.currentSelector.key) State.currentSelector.key = firstKey;
     }
 
     aggSel.addEventListener('change', () => {
