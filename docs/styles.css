@@ -210,3 +210,10 @@ table.data tbody td.num { text-align: right; font-variant-numeric: tabular-nums;
 .tag-pill { display: inline-block; background: var(--pill-bg); color: var(--primary-blue); padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; margin-right: 4px; }
 
 .error-box { background: #fdecea; color: var(--warn); border: 1px solid #f3c7be; padding: 10px 14px; border-radius: var(--radius-sm); }
+
+
+.boot-progress { margin-top: 8px; width: 280px; height: 8px; background: #e9eef3; border-radius: 999px; overflow: hidden; }
+.boot-progress-bar { height: 100%; background: linear-gradient(90deg, var(--accent-teal), #66d6c2); transition: width 180ms ease; }
+.boot-progress-text { margin-top: 6px; font-size: 12px; color: var(--text-muted); }
+.global-loader { position: sticky; top: 0; z-index: 50; height: 3px; background: transparent; }
+.global-loader-bar { height: 100%; width: 0%; background: var(--accent-teal); transition: width 160ms ease; }
